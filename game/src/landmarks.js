@@ -1,3 +1,5 @@
+import { tint } from './painter.js';
+
 // District landmarks are drawn from geometry: working port, radio mast and civic art.
 export function drawHarborCrane(p, crane) {
   const { ctx, project, prism } = p;
@@ -28,10 +30,35 @@ export function drawRadioMast(p, mast, state) {
   p.glow(b.x, b.y, 17, '#ff8d86', .5); p.circle(b.x, b.y, 3, '#ffd4aa');
 }
 export function drawShippingContainer(p, cargo) {
-  const { x, y, color } = cargo; p.prism(x, y, 100, 39, 28, color, '#976f64', '#486871');
-  for (let k = 5; k < 98; k += 10) p.line(x + k, y + 40, x + k, y + 40, '#fff0c855', 1, 22);
-  for (let k = 6; k < 94; k += 10) {
-    const a = p.project(x + k, y + 39, 3), b = p.project(x + k, y + 39, 25);
-    p.ctx.strokeStyle = '#f0d4ac44'; p.ctx.lineWidth = 1; p.ctx.beginPath(); p.ctx.moveTo(a.x, a.y); p.ctx.lineTo(b.x, b.y); p.ctx.stroke();
+  const { x, y, color } = cargo;
+  p.prism(x, y, 100, 39, 28, color, tint(color, .78), tint(color, .68));
+  for (let k = 5; k < 98; k += 6) {
+    const a = p.project(x + k, y + 39.5, 2), b = p.project(x + k, y + 39.5, 26);
+    p.ctx.strokeStyle = k % 2 ? '#f2cf9942' : '#32273b23'; p.ctx.lineWidth = 1;
+    p.ctx.beginPath(); p.ctx.moveTo(a.x, a.y); p.ctx.lineTo(b.x, b.y); p.ctx.stroke();
+  }
+  p.ground(x + 3, y + 3, 94, 33, color, 28.5, '#f5d9a67c');
+  const q = p.project(x + 50, y + 19, 29);
+  const z = p.view.zoom;
+  p.ctx.save(); p.ctx.translate(q.x, q.y);
+  p.ctx.transform(.86 * z, .48 * z, -.86 * z, .48 * z, 0, 0);
+  p.text(color === '#cb7156' ? 'MERIDIAN' : color === '#559e99' ? 'BAY LINE' : 'PIER 09', 0, 3.5, 13, '#f9e7bead', '900', 'center');
+  p.ctx.restore();
+}
+
+export function drawPortGround(p) {
+  p.ground(-84, 2680, 273, 1020, '#baaa8b', -1);
+  for (let y = 2688; y < 3700; y += 38) p.line(-78, y, 191, y, '#8e81704f');
+  p.line(-84, 2680, -84, 3700, '#f1ce96', 5);
+  for (let y = 2694; y < 3700; y += 27) {
+    p.line(-76, y, -61, y + 9, '#f6d185', 4);
+    p.line(175, y, 190, y + 9, '#f3cd81', 3);
+  }
+  for (let y = 2740; y <= 3530; y += 260) {
+    p.ground(-328, y, 258, 76, '#b3a083', 7, '#e3cca3');
+    for (let x = -320; x < -75; x += 28) p.line(x, y, x, y + 76, '#776d624d', 1.4, 8);
+    p.ground(-282, y + 99, 155, 41, '#f5e1bc', 5, '#638c87');
+    p.ground(-259, y + 105, 94, 29, '#668a85', 9);
+    p.ground(-221, y + 110, 32, 20, '#dfba92', 12);
   }
 }

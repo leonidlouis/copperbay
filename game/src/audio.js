@@ -1,6 +1,6 @@
 // Synthesized coastal electro score, engine, gunfire, impact and two-tone police sirens.
 export function createAudio() {
-  let ctx, master, engine, engineGain, clock = 0, beat = 0, volume = .32;
+  let ctx, master, engine, engineGain, clock = 0, beat = 0, volume = .32, rotorClock = 0;
   function unlock() {
     if (!ctx) {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -33,6 +33,15 @@ export function createAudio() {
       if (!ctx) return;
       engineGain.gain.setTargetAtTime(state.player.car && state.screen === 'play' ? .07 : 0, ctx.currentTime, .1);
       engine.frequency.setTargetAtTime(35 + Math.abs(state.player.car?.speed || 0) * .4, ctx.currentTime, .1);
+      rotorClock += dt;
+      if (rotorClock >= .13) {
+        rotorClock %= .13;
+        const air = state.air;
+        if (air && state.screen === 'play' && !state.mapOpen && !state.garageOpen) {
+          const d = Math.hypot(air.x - state.player.x, air.y - state.player.y);
+          if (d < 810) tone(66, .12, .085 * (1 - d / 810), 'triangle', 38);
+        }
+      }
       clock += dt;
       if (clock > .3) {
         clock = 0; beat++;

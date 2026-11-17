@@ -5,6 +5,7 @@ import { createAudio } from './audio.js';
 import { readSave, writeSave, readSettings, saveSettings } from './save.js';
 import { advanceBriefing, startBriefing } from './missions.js';
 import { stageShot } from './shots.js';
+import { useGarage } from './garage.js';
 import { lerp, clamp } from './math.js';
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas), input = createInput(canvas), audio = createAudio();
@@ -27,11 +28,14 @@ function action(id) {
   if (id === 'save' && state.heat === 0) { writeSave(state); save = readSave(); }
   if (id === 'louder' || id === 'quieter') { settings.volume = clamp(settings.volume + (id === 'louder' ? .1 : -.1), 0, 1); audio.setVolume(settings.volume); saveSettings(settings); }
   if (['ammo', 'armor', 'health', 'shotgun'].includes(id)) buyItem(state, id);
+  if (id === 'service' || id === 'tune' || id.startsWith('claim-')) useGarage(state, id);
   if (id === 'closeShop') state.shopOpen = false;
+  if (id === 'closeGarage') state.garageOpen = false;
 }
 function handleInput() {
   if (input.take('Escape') || input.take('KeyP')) {
     if (state.settingsOpen) state.settingsOpen = false;
+    else if (state.garageOpen) state.garageOpen = false;
     else if (state.shopOpen) state.shopOpen = false;
     else if (state.mapOpen) state.mapOpen = false;
     else if (state.screen === 'play') state.screen = 'pause';
@@ -42,13 +46,13 @@ function handleInput() {
     if (state.settingsOpen) action('resume');
     else if (state.screen === 'title') action('new');
     else if (state.screen === 'wasted' || state.screen === 'busted') action('restart');
-    else if (state.screen === 'complete' || state.screen === 'ending' || state.screen === 'pause') action('resume');
+    else if (state.screen === 'ending' || state.screen === 'pause') action('resume');
     else if (state.mission.briefing) advanceBriefing(state);
   }
   if (state.screen === 'play') {
     if (input.take('KeyE')) interact(state);
     if (input.take('Tab') && state.mission.active) { state.mission.briefing = true; state.mission.radio = true; state.mission.dialogue = 0; }
-    if (input.take('KeyM')) state.mapOpen = !state.mapOpen;
+    if (input.take('KeyM') && !state.shopOpen && !state.garageOpen) state.mapOpen = !state.mapOpen;
     if (input.take('KeyK')) {
       if (state.heat === 0) { writeSave(state); save = readSave(); }
       else state.toast = { text: 'Lose the heat before saving', time: 3 };
@@ -60,7 +64,7 @@ function handleInput() {
   if (input.pointer.clicked) {
     const b = renderer.buttons.find(b => input.pointer.x >= b.x && input.pointer.x <= b.x + b.w && input.pointer.y >= b.y && input.pointer.y <= b.y + b.h);
     if (b) { action(b.id); input.pointer.down = false; }
-    else if (state.mission.briefing) { advanceBriefing(state); input.pointer.down = false; }
+    else if (state.mission.briefing && !state.mission.radio && !state.mapOpen) { advanceBriefing(state); input.pointer.down = false; }
   }
   input.clear();
 }
@@ -77,7 +81,7 @@ function frame(now) {
   if (state.screen !== 'title') {
     const car = state.player.car, look = car ? Math.min(140, Math.abs(car.speed) * .3) : 0;
     const x = state.player.x + Math.cos(state.player.angle) * look, y = state.player.y + Math.sin(state.player.angle) * look;
-    state.camera.x = lerp(state.camera.x, x, 1 - Math.exp(-dt * 5)); state.camera.y = lerp(state.camera.y, y, 1 - Math.exp(-dt * 5)); state.camera.zoom = lerp(state.camera.zoom, car ? 1 : 1.22, dt * 2);
+    state.camera.x = lerp(state.camera.x, x, 1 - Math.exp(-dt * 5)); state.camera.y = lerp(state.camera.y, y, 1 - Math.exp(-dt * 5)); state.camera.zoom = lerp(state.camera.zoom, car ? 1 : 1.33, dt * 2);
   }
   audio.update(dt, state); renderer.draw(state, !!save, settings.volume);
 }

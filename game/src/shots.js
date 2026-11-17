@@ -1,53 +1,155 @@
-// Deterministic photography locations. These stage ordinary simulation objects;
-// the world, actors, light, particles, menus and HUD use the normal renderer.
+// Stage ordinary world entities at fixed points so the browser can photograph reproducible frames.
 import { makeCar } from './vehicles.js';
 import { createMissionState } from './missions.js';
+import { dispatchAirUnit } from './helicopter.js';
+import { fireWeapon } from './combat.js';
+import { setUpGetaway, updateGetaway } from './getaway.js';
+
+function frame(state, x, y, cameraX, cameraY, zoom, time) {
+  state.screen = 'play';
+  state.elapsed = 37.4;
+  state.time = time;
+  state.toast.time = 0;
+  Object.assign(state.player, { x, y, money: 9260, ammo: 86, health: 78, armor: 62 });
+  state.camera = { x: cameraX, y: cameraY, zoom };
+  state.cars = state.cars.filter(car => Math.hypot(car.x - x, car.y - y) > 640);
+  state.peds = state.peds.filter(ped => Math.hypot(ped.x - x, ped.y - y) > 415);
+}
+
+function traffic(state, x, y, type, color, angle, speed = 0) {
+  const car = makeCar(x, y, type, color, angle);
+  car.speed = speed;
+  car.driver = speed !== 0;
+  car.parked = !car.driver;
+  state.cars.push(car);
+  return car;
+}
+
+function pedestrian(state, x, y, i, flee = false) {
+  const color = ['#f2c577', '#6fbab8', '#df7f6f', '#e4ccb7', '#baa5d3'][i % 5];
+  state.peds.push({ x, y, hp: 65, angle: flee ? Math.atan2(y - state.player.y, x - state.player.x) : i * 1.3, flee: flee ? 4 : 0, color, seed: i, police: false });
+}
+
+function hostile(state, x, y, police, i) {
+  const angle = Math.atan2(state.player.y - y, state.player.x - x);
+  const ped = { x, y, hp: i % 2 ? 73 : 94, enemy: !police, police, angle, flee: 0, color: '#bd6b66', seed: i, cooldown: .6 };
+  state.peds.push(ped);
+  return ped;
+}
+
+function getaway(state) {
+  frame(state, 352, 1206, 256, 1208, 1.25, 17.33);
+  state.mission = createMissionState(4);
+  state.mission.active = true;
+  state.heat = 4;
+  const hero = traffic(state, 352, 1206, 'coupe', '#ed6941', -1.28, 447);
+  hero.stolen = true;
+  state.player.car = hero;
+  state.player.angle = hero.angle;
+  for (const [x, y, angle, speed] of [[350, 1321, -1.68, 338], [278, 1229, -1.41, 320], [272, 1406, -1.67, 315], [287, 1510, -1.49, 311], [279, 1082, 1.27, 285]]) {
+    traffic(state, x, y, 'patrol', '#edeadc', angle, speed);
+  }
+  traffic(state, 346, 1024, 'taxi', '#efbf52', 1.57, 82);
+  traffic(state, 283, 929, 'sedan', '#82abbb', -1.57, 84);
+  traffic(state, 543, 1250, 'van', '#69a5a1', Math.PI, 105);
+  traffic(state, 809, 1309, 'sedan', '#dda9ad', 0, 90);
+  traffic(state, 289, 1591, 'coupe', '#88ab9a', 1.56, 90);
+  for (let i = 0; i < 23; i++) {
+    const x = i % 3 === 0 ? 402 + (i % 4) * 6 : 199 + (i % 4) * 8;
+    pedestrian(state, x, 915 + i * 28, i, i % 5 !== 0);
+  }
+
+  const air = dispatchAirUnit(state, 119, 1310);
+  air.altitude = 191;
+  air.angle = -.71;
+  air.tracking = true;
+  air.beam = { x: 355, y: 1261 };
+  for (let i = 0; i < 39; i++) {
+    const x = 351 - Math.sin(i / 12) * 22;
+    state.effects.skid(x, 1212 + i * 7, -1.52 + .13 * Math.cos(i / 12));
+    if (i < 17 && i % 2 === 0) state.effects.burst(x, 1225 + i * 6, '#eee1c2d0', 5, 58, 6);
+  }
+  state.effects.burst(360, 1285, '#ffd381', 28, 153, 8);
+  state.effects.update(.28);
+}
+
+function plaza(state) {
+  frame(state, 551, 1043, 530, 1022, 1.74, 16.85);
+  state.mission = createMissionState(1);
+  Object.assign(state.mission, { active: true, step: 1, briefing: true, dialogue: 2, radio: true });
+  state.heat = 2;
+  const player = state.player;
+  player.money = 1850;
+  const targets = [[627, 976], [650, 1117], [546, 937]];
+  targets.forEach(([x, y], i) => hostile(state, x, y, false, i));
+  const officer = hostile(state, 460, 1183, true, 3);
+  player.angle = Math.atan2(targets[0][1] - player.y, targets[0][0] - player.x);
+  state.walking = true;
+  const scene = setUpGetaway(state);
+  scene.ally.x = 512; scene.ally.y = 1130;
+  updateGetaway(state, 1 / 60);
+  state.peds.at(-1).x -= 13;
+  state.peds.at(-1).y -= 8;
+  traffic(state, 322, 1178, 'patrol', '#ece9d8', -1.29, 35);
+  traffic(state, 348, 917, 'taxi', '#e0b157', -1.57, 83);
+  traffic(state, 291, 1002, 'sedan', '#79a8ac', 1.57, 57);
+  traffic(state, 532, 827, 'van', '#69a5a1', 0, 61);
+  for (let i = 0; i < 16; i++) {
+    const x = i % 2 ? 215 + (i % 3) * 8 : 468 + i * 14;
+    const y = i % 2 ? 845 + i * 31 : 909 + (i % 4) * 69;
+    if (Math.hypot(x - player.x, y - player.y) > 37 && !state.city.blocked(x, y)) pedestrian(state, x, y, i, true);
+  }
+  state.pickups.push({ x: 626, y: 1056, kind: 'ammo', value: 40 });
+  fireWeapon(state, player.x, player.y, player.angle);
+  const tracer = state.bullets.at(-1);
+  tracer.x += Math.cos(tracer.angle) * 61;
+  tracer.y += Math.sin(tracer.angle) * 61;
+  fireWeapon(state, officer.x, officer.y, officer.angle, 'enemy');
+  officer.muzzle = .08;
+  const returnFire = state.bullets.at(-1);
+  returnFire.x += Math.cos(returnFire.angle) * 34;
+  returnFire.y += Math.sin(returnFire.angle) * 34;
+  state.effects.update(.09);
+  state.heat = 2;
+}
+
+function cityMap(state) {
+  frame(state, 353, 1030, 435, 1050, 1.24, 16.65);
+  state.mission = createMissionState(4);
+  state.mission.active = true;
+  state.mapOpen = true;
+  state.player.shotgun = true;
+  Object.assign(state.progression, { rep: 12, records: { paloma: 19.8, customs: 31.6 }, unlockedCars: ['coupe', 'mistral'], tune: true });
+  state.player.car = traffic(state, 353, 1030, 'mistral', '#42a6a3', -1.57, 253);
+  traffic(state, 750, 812, 'taxi', '#ebbb55', 1.57, 65);
+}
+
+function customs(state) {
+  frame(state, 432, 3185, 446, 3225, 1.19, 17.35);
+  state.mission = createMissionState(5);
+  Object.assign(state.mission, { active: true, banner: 7.5, lastName: 'DEAD AIR', lastPayout: 3600 });
+  Object.assign(state.progression, { rep: 14, records: { paloma: 19.8, customs: 31.6 }, unlockedCars: ['coupe', 'mistral'], tune: true });
+  state.stats.missions = 5;
+  state.garageOpen = true;
+  state.player.money = 12860;
+  const car = traffic(state, 432, 3185, 'mistral', '#42a6a3', -.17);
+  car.hp = 54; car.tuned = true;
+  state.player.car = car;
+  state.player.angle = car.angle;
+  traffic(state, 534, 3229, 'van', '#d19a55', Math.PI, 71);
+  traffic(state, 291, 3366, 'sedan', '#c88e86', Math.PI / 2, 75);
+  traffic(state, 350, 3472, 'taxi', '#e8b654', -Math.PI / 2, 78);
+  traffic(state, 349, 3077, 'sedan', '#748d96', -Math.PI / 2, 110);
+  traffic(state, 634, 3172, 'coupe', '#f07955', 0, 88);
+  for (let i = 0; i < 17; i++) {
+    const x = i % 3 ? 401 + (i % 4) * 11 : 230;
+    pedestrian(state, x, 2890 + i * 36, i);
+  }
+}
+
 export function stageShot(state, name) {
-  state.screen = 'play'; state.elapsed = 37.4; state.time = 18.75;
-  state.toast.time = 0; state.player.money = 12480; state.player.ammo = 86; state.player.health = 88; state.player.armor = 70;
-  state.mission = createMissionState(4); state.mission.active = true;
-  state.player.x = 1732; state.player.y = 1720; state.camera = { x: 1732, y: 1720, zoom: 1.07 };
-  // Clear a small photo area, then place lane-respecting traffic at useful positions.
-  state.cars = state.cars.filter(c => Math.hypot(c.x - 1760, c.y - 1760) > 650);
-  const add = (x, y, type, color, angle, speed = 0) => { const c = makeCar(x, y, type, color, angle); c.speed = speed; c.driver = true; state.cars.push(c); return c; };
-  const hero = add(1732, 1720, 'coupe', '#ff8e70', -1.32, 345); state.player.car = hero; state.player.angle = hero.angle;
-  add(1732, 1863, 'patrol', '#e5e7db', -1.65, 300);
-  add(1570, 1732, 'patrol', '#e5e7db', .1, 280);
-  add(1970, 1788, 'patrol', '#e5e7db', Math.PI, 300);
-  add(1732, 2125, 'patrol', '#e5e7db', -Math.PI / 2, 285);
-  add(1515, 1788, 'taxi', '#edc063', 0, 95);
-  add(1732, 1445, 'van', '#70aba9', Math.PI / 2, 70);
-  add(2125, 1732, 'sedan', '#d4bbd1', Math.PI, 75);
-  add(1265, 1732, 'coupe', '#7ebca7', Math.PI, 120);
-  add(1788, 1360, 'sedan', '#d8e0cd', -Math.PI / 2, 110);
-  state.heat = 3; state.unseen = 0;
-  for (let i = 0; i < 24; i++) {
-    const side = i % 2 ? 1 : -1;
-    state.peds.push({ x: 1760 + side * 99, y: 1370 + i * 33, hp: 70, angle: i * 2, flee: i % 3 ? 0 : 3, color: ['#eab477', '#65c6c3', '#e691a2', '#c0b4d1'][i % 4], seed: i, police: false });
-  }
-  for (let i = 0; i < 34; i++) state.effects.skid(1732 + Math.sin(i / 10) * 6, 1730 + i * 10, -Math.PI / 2);
-  state.effects.burst(1751, 1850, '#ffc78a', 34, 155, 10);
-  for (let i = 0; i < 8; i++) state.effects.burst(1730 + Math.sin(i) * 5, 1750 + i * 10, '#abb7b2', 3, 24, 6);
-  state.effects.update(.24);
-  state.stats = { ...state.stats, carsStolen: 9, takedowns: 12, missions: 4, distance: 18300 };
-  if (name === '2' || name === 'onfoot') {
-    state.player.car = null; state.player.x = 1760; state.player.y = 1687; state.player.angle = 1.2; state.player.muzzle = .1;
-    hero.x = 1810; hero.y = 1740; hero.angle = -1.2; hero.speed = 0; hero.parked = true;
-    state.camera = { x: 1760, y: 1715, zoom: 1.55 }; state.time = 16.3; state.heat = 2;
-    state.mission = createMissionState(1); state.mission.active = true; state.mission.step = 1; state.mission.briefing = true; state.mission.dialogue = 1; state.mission.radio = true;
-    state.peds.push({ x: 1760, y: 1820, hp: 65, enemy: true, police: false, angle: -2, color: '#d17d7b', seed: 3, cooldown: 0 });
-    state.peds.push({ x: 1850, y: 1760, hp: 65, enemy: true, police: false, angle: -.7, color: '#b17484', seed: 4, cooldown: 0 });
-    state.peds.push({ x: 1785, y: 1595, hp: 70, police: true, angle: Math.PI / 2, color: '#6a9db0', seed: 5 });
-    state.bullets.push({ x: 1790, y: 1754, angle: 1.2, life: .5, owner: 'player' });
-    state.effects.burst(1797, 1798, '#ffc383', 18, 90, 16);
-    state.pickups.push({ x: 1720, y: 1730, kind: 'ammo', value: 40 }, { x: 1700, y: 1760, kind: 'cash', value: 100 });
-  }
-  if (name === '3' || name === 'title') {
-    state.screen = 'title'; state.time = 17.4; state.camera = { x: 200, y: 3070, zoom: 1.05 };
-  }
-  if (name === '4' || name === 'complete') {
-    state.screen = 'complete'; state.time = 6.7; state.mission.index = 5; state.mission.active = false; state.mission.lastName = 'DEAD AIR'; state.mission.lastPayout = 3600; state.mission.banner = 0;
-    state.stats.missions = 5; state.player.money = 16080; state.heat = 0;
-  }
-  return state;
+  if (name === '2' || name === 'onfoot') plaza(state);
+  else if (name === '3' || name === 'map') cityMap(state);
+  else if (name === '4' || name === 'customs') customs(state);
+  else getaway(state);
 }

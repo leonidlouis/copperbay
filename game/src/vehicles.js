@@ -1,21 +1,23 @@
-import { clamp, angleDelta, distance, randomGenerator } from './math.js';
-import { ROAD_CENTERS, ROAD_GAP } from './city.js';
+import { clamp, distance, randomGenerator } from './math.js';
+import { ROAD_CENTERS } from './city.js';
 export const VEHICLE_TYPES = {
-  coupe: { name: 'CAVELL XR', max: 455, accel: 245, turn: 2.75, grip: 6, w: 29, d: 62, hp: 120 },
+  coupe: { name: 'CAVELL XR', sport: true, max: 455, accel: 245, turn: 2.75, grip: 6, w: 29, d: 62, hp: 120 },
+  mistral: { name: 'MISTRAL RS', max: 485, accel: 267, turn: 2.9, grip: 7, w: 31, d: 64, hp: 130, sport: true },
+  caldera: { name: 'CALDERA GT', max: 530, accel: 295, turn: 2.55, grip: 6, w: 33, d: 70, hp: 160, sport: true },
   sedan: { name: 'BAYLINER', max: 315, accel: 170, turn: 2.3, grip: 8, w: 31, d: 65, hp: 150 },
   van: { name: 'PORTER VAN', max: 260, accel: 125, turn: 1.7, grip: 9, w: 35, d: 77, hp: 210 },
   taxi: { name: 'SUN CAB', max: 335, accel: 180, turn: 2.4, grip: 7, w: 31, d: 65, hp: 150 },
   patrol: { name: 'CBPD INTERCEPTOR', max: 405, accel: 220, turn: 2.6, grip: 8, w: 33, d: 68, hp: 185 },
 };
 export function makeCar(x, y, type = 'sedan', color = '#f3c96b', angle = -Math.PI / 2) {
-  return { x, y, type, color, angle, speed: 0, vx: 0, vy: 0, hp: VEHICLE_TYPES[type].hp, police: type === 'patrol', driver: false, parked: false, cooldown: 0, wreck: false, route: null, flash: 0 };
+  return { x, y, type, color, angle, speed: 0, vx: 0, vy: 0, hp: VEHICLE_TYPES[type].hp, police: type === 'patrol', driver: false, parked: false, cooldown: 0, wreck: false, flash: 0, door: 0, tuned: false };
 }
 export function spawnTraffic() {
   const r = randomGenerator(891), cars = [];
   const types = ['coupe', 'sedan', 'van', 'taxi'];
   const colors = ['#e5be6c', '#4baeb3', '#dc6b79', '#dedbd0', '#7876a0', '#a0ba91'];
   for (let i = 0; i < 80; i++) {
-    const cx = ROAD_CENTERS[1 + Math.floor(r() * 6)], cy = ROAD_CENTERS[1 + Math.floor(r() * 6)];
+    const cx = ROAD_CENTERS[Math.floor(r() * 7)], cy = ROAD_CENTERS[Math.floor(r() * 7)];
     const horizontal = r() > .5, dir = r() > .5 ? 1 : -1;
     const car = makeCar(horizontal ? cx + r() * 380 : cx - dir * 28, horizontal ? cy + dir * 28 : cy + r() * 380, types[i % 4], colors[i % colors.length], horizontal ? (dir > 0 ? 0 : Math.PI) : (dir > 0 ? Math.PI / 2 : -Math.PI / 2));
     car.driver = true; car.cruise = 80 + r() * 55; car.speed = car.cruise; car.seed = i; cars.push(car);
@@ -26,22 +28,26 @@ export function spawnTraffic() {
     car.parked = true; cars.push(car);
   }
   // The first getaway car is always just outside Mara's garage.
-  const starter = makeCar(825, 825, 'coupe', '#f58a69', -Math.PI / 2); starter.parked = true; cars.push(starter);
+  const starter = makeCar(825, 825, 'coupe', '#f58a69', Math.PI / 2); starter.parked = true; cars.push(starter);
   return cars;
 }
+export function topSpeed(car) {
+  return VEHICLE_TYPES[car.type].max * (car.tuned ? 1.12 : 1);
+}
+
 export function moveCar(state, car, throttle, steering, brake, dt) {
   if (car.wreck) return;
   const spec = VEHICLE_TYPES[car.type];
-  car.speed += throttle * spec.accel * dt;
+  car.speed += throttle * spec.accel * (car.tuned ? 1.10 : 1) * dt;
   car.speed *= Math.exp(-(brake ? 3.2 : throttle ? .12 : .85) * dt);
-  car.speed = clamp(car.speed, -spec.max * .35, spec.max);
+  car.speed = clamp(car.speed, -spec.max * .35, topSpeed(car));
   const steerPower = Math.min(1, Math.abs(car.speed) / 70);
   car.angle += steering * spec.turn * steerPower * dt * (car.speed < 0 ? -1 : 1) * (brake ? 1.55 : 1);
   const grip = brake ? 1.8 : spec.grip;
   car.vx += (Math.cos(car.angle) * car.speed - car.vx) * Math.min(1, dt * grip);
   car.vy += (Math.sin(car.angle) * car.speed - car.vy) * Math.min(1, dt * grip);
   const nx = car.x + car.vx * dt, ny = car.y + car.vy * dt;
-  if (state.city.blocked(nx, ny, 17)) {
+  if (state.city.blocked(nx, ny, 17, true)) {
     if (Math.abs(car.speed) > 75) {
       car.hp -= Math.abs(car.speed) * .08;
       state.effects.burst(car.x, car.y, '#ffc579', 10, 80);
@@ -57,7 +63,7 @@ export function moveCar(state, car, throttle, steering, brake, dt) {
 export function updateTraffic(state, dt) {
   const playerCar = state.player.car;
   for (const car of state.cars) {
-    car.cooldown = Math.max(0, car.cooldown - dt); car.flash = Math.max(0, car.flash - dt);
+    car.cooldown = Math.max(0, car.cooldown - dt); car.flash = Math.max(0, car.flash - dt); car.door = Math.max(0, car.door - dt);
     if (car === playerCar || car.police || car.wreck || !car.driver || car.parked) continue;
     let targetSpeed = car.cruise;
     // Brake for cars ahead in the same lane, and for pedestrians crossing close by.
@@ -87,6 +93,14 @@ export function updateTraffic(state, dt) {
     if (car.y > 3870) car.y = 260;
   }
 }
+export function ejectDriver(state, car) {
+  const dx = -Math.sin(car.angle) * 32, dy = Math.cos(car.angle) * 32;
+  const fallback = state.city.blocked(car.x + dx, car.y + dy, 7) ? -1 : 1;
+  car.door = .82; car.doorSide = fallback;
+  state.peds.push({ x: car.x + dx * fallback, y: car.y + dy * fallback, angle: car.angle, hp: 60, flee: 10, color: '#e5b06e', police: false, seed: 99 });
+  car.driver = false;
+}
+
 export function interactWithCar(state) {
   const p = state.player;
   if (p.car) {
@@ -94,7 +108,7 @@ export function interactWithCar(state) {
     const offsets = [Math.PI / 2, -Math.PI / 2, Math.PI];
     for (const offset of offsets) {
       const x = car.x + Math.cos(car.angle + offset) * 49, y = car.y + Math.sin(car.angle + offset) * 49;
-      if (!state.city.blocked(x, y, 9)) { p.x = x; p.y = y; p.car = null; car.driver = false; car.parked = true; state.toast = { text: 'On foot · click to fire / F to punch', time: 3 }; return true; }
+      if (!state.city.blocked(x, y, 9)) { p.x = x; p.y = y; p.car = null; car.driver = false; car.parked = true; car.door = .72; car.doorSide = offset < 0 ? -1 : 1; state.toast = { text: 'On foot · click to fire / F to punch', time: 3 }; return true; }
     }
     return true;
   }
@@ -102,7 +116,7 @@ export function interactWithCar(state) {
   if (!car) return false;
   if (car.driver || car.police) {
     state.crime(car.police ? 1.5 : .8);
-    state.peds.push({ x: car.x + 40, y: car.y, angle: 0, hp: 60, flee: 10, color: '#db9d75', police: false, seed: 99 });
+    ejectDriver(state, car);
   }
   p.car = car; car.driver = false; car.parked = false; if (!car.stolen) { state.stats.carsStolen++; car.stolen = true; }
   p.x = car.x; p.y = car.y; state.audio.sound('click');

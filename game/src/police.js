@@ -1,6 +1,7 @@
 import { ROAD_CENTERS, roadDistance } from './city.js';
 import { makeCar, moveCar } from './vehicles.js';
 import { angleDelta, clamp, distance } from './math.js';
+import { updateAirUnit } from './helicopter.js';
 const nearestRoad = v => ROAD_CENTERS.reduce((a, b) => Math.abs(v - a) < Math.abs(v - b) ? a : b);
 export function commitCrime(state, severity = 1) {
   state.heat = clamp(state.heat + severity, 0, 5); state.lastCrime = state.elapsed; state.unseen = 0;
@@ -26,11 +27,10 @@ function chaseWaypoint(car, p) {
 }
 export function updatePolice(state, dt) {
   const level = Math.ceil(state.heat), p = state.player;
-  const active = state.cars.filter(c => c.police && !c.wreck);
+  const active = state.cars.filter(c => c.police && !c.parked && !c.wreck && c !== p.car);
   let seen = false;
   for (const car of active) {
     const d = distance(car, p);
-    if (car.parked) continue;
     if (level <= 0) { car.driver = false; continue; }
     if (d < 570 && !state.city.blocked((car.x + p.x) / 2, (car.y + p.y) / 2, 0)) seen = true;
     if (d > 2000) { car.wreck = true; continue; }
@@ -43,6 +43,7 @@ export function updatePolice(state, dt) {
     moveCar(state, car, throttle, clamp(turn * 2.3, -1, 1), Math.abs(turn) > 1.2, dt);
     if (d < 70 && !p.car) { car.speed *= .92; if (d < 45) { state.bust += dt * 1.4; if (state.bust > 3) state.screen = 'busted'; } }
   }
+  if (updateAirUnit(state, dt, seen)) seen = true;
   if (level > 0) {
     state.policeTimer -= dt;
     if (state.policeTimer <= 0 && active.length < Math.min(10, level * 2)) { spawnPolice(state); state.policeTimer = 4.5; }
@@ -55,9 +56,17 @@ export function updatePolice(state, dt) {
     if (level >= 4 && !state.roadblocks.length) {
       const x = nearestRoad(p.x + 480), y = nearestRoad(p.y);
       state.roadblocks.push({ x, y });
-      for (const dx of [-45, 10, 65]) { const c = makeCar(x + dx, y + 115, 'patrol', '#e5e7d9', 0); c.parked = true; state.cars.push(c); }
-      state.toast = { text: 'DISPATCH · Roadblocks authorized. Find another route.', time: 5 };
+      for (const dx of [-45, 10, 65]) {
+        const c = makeCar(x + dx, y + 115, 'patrol', '#e5e7d9', 0);
+        c.parked = true;
+        c.roadblock = true;
+        state.cars.push(c);
+      }
+      state.toast = { text: 'CBPD AIR ONE ACTIVE · Roadblocks ahead', time: 5 };
     }
   }
-  if (state.heat === 0 && state.roadblocks.length) state.roadblocks.length = 0;
+  if (state.heat === 0 && state.roadblocks.length) {
+    state.roadblocks.length = 0;
+    state.cars = state.cars.filter(car => !car.roadblock || car.stolen);
+  }
 }

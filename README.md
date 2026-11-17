@@ -16,13 +16,14 @@ Read Inez's opening conversation with Enter, then press E to take the coral Cave
 
 ## Features
 
-- A seeded, explorable city: Port Meridian's cranes and piers, Crown Quarter's commercial blocks, Saffron Strip's neon storefronts, and Verdigris Hills' pool terraces. Roads, crosswalks, signals, sidewalks, rooftop equipment, parks, palms and water.
-- On-foot movement, sprinting, mouse aiming, punches, pistols and an unlockable scattergun. Enemy gunfire, armor, health, cash and weapon caches, and Night Owl Supply's equipment shop.
-- Steal and drive Cavell XR coupes, Bayliner sedans, Porter vans, Sun Cabs and police interceptors, each with its own acceleration, speed, steering, grip and durability. Lane traffic brakes for signals and other cars. Pedestrians flee danger.
-- Five wanted levels, pursuing police cars, armed officers, arrest pressure and roadblocks. Break contact to lose heat. Ghost Customs repairs and resprays a car for $250, clearing the search.
-- Six story jobs with Inez Rook, Sol Navarro, Ada Wren and Mara Vale. Conversations, distinct objectives, payouts, chapter results and a concluding radio broadcast. Explore freely after the story.
-- Circular minimap, full city map, vehicle speedometer, mission guidance, health, armor, ammunition, cash and wanted stars. Day/night lighting, headlights, sirens, skid marks, particles, gun flashes, explosions and camera shake.
-- Synthesized coastal electro music and effects, adjustable volume, pause, WASTED/BUSTED recovery, New Game and Continue. Progress saves locally at chapter boundaries, periodically without heat, and with K. Continue resumes the current chapter from its contact; an in-progress objective is retried.
+- Five districts to explore on foot and by car. Paloma Beach has a walkable shore, coastal boulevard, boardwalk and plaza. Across town are Port Meridian’s piers and cranes, Crown Quarter’s commercial blocks, Saffron Strip’s clubs and Verdigris Hills’ pool terraces.
+- Steal and drive coupes, sedans, vans, Sun Cabs and police interceptors with distinct handling. Traffic stops for lights and other road users. Pedestrians scatter when a chase or a shootout comes close.
+- Six story jobs with Inez Rook, Sol Navarro and Ada Wren. Mara steals a ledger, fights Voss’s couriers, races a timed delivery and tries to get the evidence onto Free Bay Radio. Explore freely after the story.
+- Five wanted levels with patrol cars, armed officers and arrest pressure. At four stars, roadblocks go up and CBPD Air One sweeps the streets. Break contact to lose heat or pay Ghost Customs to clear the search.
+- Two checkpoint time trials, Paloma Sprint and Port Loop. Beat the clock for cash and a saved personal best. Story jobs and first trial wins earn reputation and unlock the Mistral RS, Caldera GT and a persistent street tune at Ghost Customs.
+- Pistol, fists and an unlockable scattergun. Stock up on ammunition, armor and health at Night Owl Supply or pick up caches around the city.
+- Circular minimap, full city map with job and service markers, and a profile showing chapter progress, weapons, vehicles and trial times. The city runs through daylight and night with moving surf, streetlights, sirens, skid marks, particles and camera shake.
+- Synthesized music and effects, adjustable volume, pause, arrest and death recovery, New Game and Continue. The game saves locally at chapter boundaries, periodically without heat, and via K. Continue restores your saved position, cash, equipment, reputation, garage and records. In-progress objectives and trials restart.
 
 ## Controls
 
@@ -31,27 +32,27 @@ Read Inez's opening conversation with Enter, then press E to take the coral Cave
 | WASD / arrow keys | Walk relative to the screen; accelerate/reverse and steer a car |
 | Shift | Sprint on foot |
 | Space | Handbrake while driving |
-| E | Enter, steal or exit a car; talk to a contact; use a shop or service |
+| E | Enter, steal or exit a car, talk, use a shop or garage, or start a marked time trial in a car with no heat |
 | Mouse / left click | Aim / fire; advance a conversation |
 | F | Punch |
 | 1 / 2 / 3 | Pistol / fists / scattergun (after acquiring it) |
-| Enter | Start, advance dialogue, continue chapter results, recover after arrest/death |
-| M | Toggle city map |
+| Enter | Start, advance dialogue, return from the ending, or recover after arrest/death |
+| M | Pause with the city map and player profile |
 | Tab | Replay the active contact’s radio call |
-| Escape / P | Pause / return; close a map or shop |
+| Escape / P | Pause or return, and close the map, shop or garage |
 | K | Save when wanted level is clear |
 | C on title | Controls and volume |
 
-On foot, visit Night Owl Supply for ammunition ($80), armor ($180), first aid ($100) or a scattergun ($650). The Bay Clinic restores health for $100. Services are marked on the city map. Your safehouse saves progress; Ghost Customs accepts a driven vehicle. Audio volume is in the title's Controls & Audio menu and the pause menu.
+On foot, visit Night Owl Supply for ammunition ($80), armor ($180), first aid ($100) or a scattergun ($650). The Bay Clinic restores health for $100. Services are marked on the city map. Your safehouse saves progress. At Ghost Customs in Port Meridian, press E and click an option to repair and respray your current car ($250), buy the street tune ($700 at 2 reputation), or collect a vehicle. The Mistral RS and Caldera GT become available at 5 and 9 reputation. Audio volume is in Controls & Audio on the title screen and in the pause menu.
 
 ## Photography and hand-in
 
-`shots.json` defines four deterministic 1280 × 800 photographs. The `?shot=1-cover`, `?shot=2`, `?shot=3` and `?shot=4` modes stage world state and use the ordinary city, actor, lighting, HUD and menu renderers. No screenshots are post-processed.
+`shots.json` defines four deterministic 1280 × 800 JPEG captures. Each `?shot=` mode stages the playable world and uses the game’s own renderers.
 
-- `1-cover.jpg`: Dead Air's three-star pursuit, traffic, pedestrians, minimap, mission and driving controls.
-- `2-on-foot.jpg`: Mara armed on a busy junction, a stealable Cavell, armed opposition and Inez's mission dialogue.
-- `3-new-game.jpg`: The title and local Continue menu overlooking Port Meridian.
-- `4-mission-passed.jpg`: Chapter payout, story progress, vehicle/combat stats and continue/new-game actions.
+- `1-cover.jpg` · Dead Air’s four-star pursuit on Paloma Boulevard, with Air One, patrols, traffic and fleeing pedestrians.
+- `2-on-foot.jpg` · Mara under fire in Paloma Plaza, an Inez radio call, and Sol opening a getaway car.
+- `3-city-map.jpg` · The city map alongside Mara’s reputation, loadout, garage and timed records.
+- `4-ghost-customs.jpg` · The Dead Air payout at Port Meridian, with Ghost Customs open and the Pier 09 objective on screen.
 
 Build the deterministic dossier with:
 
@@ -60,4 +61,4 @@ mkdir -p out
 MAKEFUN_OUTPUT_DIR=out node main.ts
 ```
 
-The hand-in preserves the kit's dossier builder and copies the static game and four JPEG photographs into `out/`. Source modules separate city generation, driving/traffic, police, combat, story, saves, audio, procedural art, HUD, input and camera/loop. All art and sound are generated by the game's own code. MIT licensed; see [LICENSE](LICENSE).
+The hand-in preserves the kit's dossier builder and copies the static game and four JPEG photographs into `out/`. Source modules separate city generation, driving and traffic, police and air pursuit, combat, story, activity timing, reputation, garage services, map and HUD, saves, audio, and procedural art. All art and sound are generated by the game's own code. MIT licensed; see [LICENSE](LICENSE).

@@ -6,20 +6,24 @@ import { spawnPedestrians, updatePedestrians, updateCombat, fireWeapon, punch } 
 import { commitCrime, updatePolice } from './police.js';
 import { createMissionState, updateMissions, missionTarget, startBriefing, advanceBriefing } from './missions.js';
 import { writeSave } from './save.js';
+import { createProgression } from './progression.js';
+import { interactWithTrial, updateTrial } from './activities.js';
+import { nearGarage } from './garage.js';
+import { updateGetaway } from './getaway.js';
 export function createWorld(audio, save = null) {
   const city = createCity();
   const state = {
-    city, audio, screen: 'title', elapsed: 0, time: save?.time || 17.8, heat: 0, lastCrime: -100, unseen: 0, policeTimer: 2, bust: 0, shake: 0, saved: 0,
+    city, audio, screen: 'title', elapsed: 0, time: save?.time ?? 17.8, heat: 0, lastCrime: -100, unseen: 0, policeTimer: 2, bust: 0, shake: 0, saved: 0,
     player: { x: save?.x || 855, y: save?.y || 790, health: 100, armor: save?.armor ?? 50, ammo: save?.ammo ?? 120, money: save?.money ?? 350, angle: -Math.PI / 2, car: null, cooldown: 0, punch: 0, muzzle: 0, invincible: 0, weapon: 'PISTOL', shotgun: save?.shotgun || false },
     cars: spawnTraffic(), peds: spawnPedestrians(), bullets: [], pickups: [
       { x: 895, y: 1280, kind: 'ammo', value: 50 }, { x: 1855, y: 2240, kind: 'health', value: 50 },
       { x: 895, y: 3200, kind: 'weapon', value: 30 }, { x: 2720, y: 895, kind: 'ammo', value: 60 },
       { x: 3200, y: 1855, kind: 'cash', value: 400 }, { x: 1280, y: 2815, kind: 'cash', value: 300 },
     ], roadblocks: [], effects: createEffects(),
-    mission: createMissionState(save?.mission || 0),
+    mission: createMissionState(save?.mission || 0), progression: createProgression(save), trial: null, air: null,
     stats: save?.stats || { carsStolen: 0, takedowns: 0, wrecks: 0, missions: 0, policeSpawned: 0, distance: 0 },
     toast: { text: 'Welcome home, Mara · Meet Inez at your garage', time: 6 },
-    camera: { x: save?.x || 855, y: save?.y || 790, zoom: 1 }, mapOpen: false, shopOpen: false, settingsOpen: false, autosave: 0,
+    camera: { x: save?.x || 855, y: save?.y || 790, zoom: 1 }, mapOpen: false, shopOpen: false, garageOpen: false, settingsOpen: false, autosave: 0,
   };
   state.crime = severity => commitCrime(state, severity);
   state.addCar = (...args) => { const car = makeCar(...args); state.cars.push(car); return car; };
@@ -28,22 +32,22 @@ export function createWorld(audio, save = null) {
   return state;
 }
 export function interact(state) {
-  if (state.mission.briefing) { advanceBriefing(state); return; }
+  if (state.mapOpen) return;
+  if (state.mission.briefing && !state.mission.radio) { advanceBriefing(state); return; }
   if (state.shopOpen) { state.shopOpen = false; return; }
+  if (state.garageOpen) { state.garageOpen = false; return; }
   const p = state.player, m = state.mission, target = missionTarget(state);
   if (!m.active && !m.complete && target && distance(p, target) < 120) { startBriefing(state); return; }
   if (!p.car) {
     for (const key of ['shop', 'clinic']) if (distance(p, PLACES[key]) < 115) {
       if (key === 'shop') { state.shopOpen = true; return; }
       if (key === 'clinic') { if (p.money >= 100) { p.money -= 100; p.health = 100; state.toast = { text: 'BAY CLINIC · Health restored −$100', time: 3 }; } else state.toast = { text: 'Clinic · $100 required', time: 3 }; return; }
-      if (key === 'home') { writeSave(state); state.toast = { text: 'HOME SAFE · Progress saved', time: 3 }; return; }
     }
   }
-  if (p.car && distance(p, PLACES.garage) < 130 && p.money >= 250) {
-    p.money -= 250; p.car.hp = 150; p.car.color = ['#f58a69', '#62d6c3', '#d7b26b'][Math.floor(state.elapsed) % 3]; state.heat = 0;
-    state.toast = { text: 'GHOST CUSTOMS · Repaired, resprayed, heat cleared −$250', time: 4 }; return;
-  }
+  if (nearGarage(state)) { state.garageOpen = true; return; }
+  if (p.car && interactWithTrial(state)) return;
   if (interactWithCar(state)) return;
+  if (interactWithTrial(state)) return;
   if (!p.car && distance(p, PLACES.home) < 115) { writeSave(state); state.toast = { text: 'HOME SAFE · Progress saved', time: 3 }; return; }
   state.toast = { text: 'Find a car, contact, safehouse or shop · M opens the city map', time: 3 };
 }
@@ -59,10 +63,12 @@ export function buyItem(state, item) {
 }
 export function updateWorld(state, input, aim, dt) {
   if (state.screen !== 'play') return;
+  if (state.mapOpen || state.shopOpen || state.garageOpen || (state.mission.briefing && !state.mission.radio)) return;
   state.elapsed += dt; state.time = (state.time + dt / 100) % 24;
   state.saved = Math.max(0, state.saved - dt); state.shake *= Math.exp(-dt * 12); state.toast.time = Math.max(0, state.toast.time - dt);
+  state.mission.banner = Math.max(0, state.mission.banner - dt);
+  if (state.rankNotice) state.rankNotice.time = Math.max(0, state.rankNotice.time - dt);
   state.effects.update(dt);
-  if (state.mapOpen || state.shopOpen || state.mission.briefing) return;
   const p = state.player, oldX = p.x, oldY = p.y;
   if (p.car) {
     const throttle = (input.key('KeyW') || input.key('ArrowUp') ? 1 : 0) - (input.key('KeyS') || input.key('ArrowDown') ? 1 : 0);
@@ -86,6 +92,8 @@ export function updateWorld(state, input, aim, dt) {
   }
   state.stats.distance += Math.hypot(p.x - oldX, p.y - oldY);
   updateTraffic(state, dt); updateCarCollisions(state, dt); updatePolice(state, dt); updatePedestrians(state, dt); updateCombat(state, dt); updateMissions(state, dt);
+  updateTrial(state, dt);
+  updateGetaway(state, dt);
   state.autosave += dt;
   if (state.autosave > 40 && state.heat === 0) { writeSave(state); state.autosave = 0; }
 }

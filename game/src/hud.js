@@ -1,13 +1,17 @@
-import { ROAD_CENTERS, PLACES, DISTRICTS, districtAt } from './city.js';
+import { BEACH_EDGE, ROAD_CENTERS, PLACES, districtAt } from './city.js';
 import { currentMission, missionTarget, missionObjective, STORY } from './missions.js';
-import { VEHICLE_TYPES } from './vehicles.js';
+import { VEHICLE_TYPES, topSpeed } from './vehicles.js';
+import { TRIALS, nearbyTrial } from './activities.js';
+import { nearGarage } from './garage.js';
+import { drawMapScreen } from './map-screen.js';
+import { drawGarageScreen } from './garage-screen.js';
 import { clamp, distance, TAU } from './math.js';
 const CREAM = '#fff0d5', MUTED = '#a9c3c4', GOLD = '#ffd080', MINT = '#7fe6c7';
 export function createHUD(p) {
   const { ctx, text, circle } = p;
   const buttons = [];
   function panel(x, y, w, h, alpha = .91) {
-    ctx.fillStyle = `rgba(13,35,48,${alpha})`; ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill();
+    ctx.fillStyle = `rgba(22,43,48,${alpha})`; ctx.beginPath(); ctx.roundRect(x, y, w, h, 9); ctx.fill();
     ctx.strokeStyle = '#c1d2c622'; ctx.lineWidth = 1; ctx.stroke();
   }
   function label(str, x, y, color = MUTED) { text(str, x, y, 11, color, '800'); }
@@ -21,83 +25,142 @@ export function createHUD(p) {
     text(sub, x + w - 18, y + 35, 13, accent ? '#345361' : MUTED, '700', 'right');
     if (!disabled) buttons.push({ id, x, y, w, h: 58 });
   }
-  function minimap(state, cx = 133, cy = 635, radius = 93, full = false) {
+  function minimap(state, cx = 124, cy = 648, radius = 88) {
     const player = state.player, target = missionTarget(state);
-    const mapScale = full ? radius * 2 / 4300 : .13;
-    const centerX = full ? 2050 : player.x, centerY = full ? 2050 : player.y;
-    const map = (x, y) => ({ x: cx + (x - centerX) * mapScale, y: cy + (y - centerY) * mapScale });
+    const run = state.trial;
+    const way = run ? run.course.gates[run.gate] : target;
+    const rate = .16;
+    const map = (x, y) => ({ x: cx + (x - player.x) * rate, y: cy + (y - player.y) * rate });
+    const land = map(190, 190), beach = map(BEACH_EDGE, 245);
     ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, radius, 0, TAU); ctx.clip();
-    ctx.fillStyle = '#174b59'; ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-    const land = map(190, 190); ctx.fillStyle = '#284d52'; ctx.fillRect(land.x, land.y, 3790 * mapScale, 3790 * mapScale);
-    ctx.strokeStyle = '#738d89'; ctx.lineWidth = Math.max(4, 146 * mapScale); ctx.beginPath();
-    for (const v of ROAD_CENTERS) { let a = map(v, 190), b = map(v, 3970); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); a = map(190, v); b = map(3970, v); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); } ctx.stroke();
-    ctx.strokeStyle = '#243d49'; ctx.lineWidth = Math.max(2, 100 * mapScale); ctx.stroke();
-    if (target) {
-      const t = map(target.x, target.y), a = map(player.x, player.y);
-      ctx.strokeStyle = '#f5ce7899'; ctx.lineWidth = full ? 3 : 2; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(t.x, a.y); ctx.lineTo(t.x, t.y); ctx.stroke(); ctx.setLineDash([]);
-      const dx = t.x - cx, dy = t.y - cy, d = Math.hypot(dx, dy); const f = Math.min(1, (radius - 10) / (d || 1));
-      const x = cx + dx * f, y = cy + dy * f;
-      p.poly([{ x, y: y - 6 }, { x: x + 6, y }, { x, y: y + 6 }, { x: x - 6, y }], GOLD, '#fff0d1');
+    ctx.fillStyle = '#3c8587'; ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    ctx.fillStyle = '#d6bb91'; ctx.fillRect(beach.x, beach.y, (190 - BEACH_EDGE) * rate, 2225 * rate);
+    ctx.fillStyle = '#3c5e5d'; ctx.fillRect(land.x, land.y, 3790 * rate, 3790 * rate);
+    ctx.strokeStyle = '#83928b'; ctx.lineWidth = 149 * rate; ctx.beginPath();
+    for (const v of ROAD_CENTERS) {
+      let a = map(v, 190), b = map(v, 3970); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+      a = map(190, v); b = map(3970, v); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     }
-    for (const place of Object.values(PLACES)) { const q = map(place.x, place.y); circle(q.x, q.y, full ? 4 : 2.5, MINT); if (full) text(place.name, q.x + 8, q.y - 5, 9, CREAM); }
-    for (const car of state.cars) if (car.police && !car.wreck && state.heat > 0) { const q = map(car.x, car.y); circle(q.x, q.y, full ? 4 : 3.3, Math.floor(state.elapsed * 4) % 2 ? '#ff8089' : '#88c9ff'); }
-    const q = map(player.x, player.y);
-    ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(player.angle + Math.PI / 2); p.poly([{ x: 0, y: -8 }, { x: 5, y: 6 }, { x: 0, y: 3 }, { x: -5, y: 6 }], '#ffffff', '#1b424c'); ctx.restore();
-    if (full) for (const d of DISTRICTS) { const q = map(d.x, d.y); text(d.tag, q.x, q.y + 25, 11, d.color, '900', 'center'); }
-    ctx.restore(); ctx.lineWidth = 4; ctx.strokeStyle = '#d0c9a6'; ctx.beginPath(); ctx.arc(cx, cy, radius + 2, 0, TAU); ctx.stroke();
-    text('N', cx, cy - radius + 15, 11, CREAM, '900', 'center');
+    ctx.stroke(); ctx.strokeStyle = '#283f4a'; ctx.lineWidth = 114 * rate; ctx.stroke();
+    if (way) {
+      const t = map(way.x, way.y);
+      ctx.strokeStyle = run ? '#94ebc5' : '#f5ce78'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.beginPath();
+      ctx.moveTo(cx, cy); ctx.lineTo(t.x, cy); ctx.lineTo(t.x, t.y); ctx.stroke(); ctx.setLineDash([]);
+      const dx = t.x - cx, dy = t.y - cy, f = Math.min(1, (radius - 10) / (Math.hypot(dx, dy) || 1));
+      const x = cx + dx * f, y = cy + dy * f;
+      p.poly([{ x, y: y - 6 }, { x: x + 6, y }, { x, y: y + 6 }, { x: x - 6, y }], run ? MINT : GOLD, '#fff0d1');
+    }
+    for (const place of Object.values(PLACES)) { const q = map(place.x, place.y); circle(q.x, q.y, 3, MINT); }
+    for (const trial of TRIALS) { const q = map(trial.gates[0].x, trial.gates[0].y); circle(q.x, q.y, 4, '#bfc9ee'); }
+    for (const car of state.cars) {
+      if (car === player.car || car.wreck || !car.driver) continue;
+      const q = map(car.x, car.y);
+      circle(q.x, q.y, car.police && state.heat ? 4.3 : 2.4, car.police && state.heat ? '#ff777c' : '#b6c9c0b0');
+    }
+    if (state.air && !state.air.departing) {
+      const q = map(state.air.x, state.air.y);
+      circle(q.x, q.y, 6.5, '#26354c');
+      text('+', q.x, q.y + 4, 12, '#f5a79d', '900', 'center');
+    }
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(player.angle + Math.PI / 2);
+    p.poly([{ x: 0, y: -9 }, { x: 6, y: 6 }, { x: 0, y: 3 }, { x: -6, y: 6 }], '#ffffff', '#162d38'); ctx.restore();
+    ctx.restore(); ctx.strokeStyle = '#263d42'; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(cx, cy, radius + 2, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 3; ctx.strokeStyle = '#f5d9a8'; ctx.stroke();
+    circle(cx, cy - radius, 10, '#263d42');
+    text('N', cx, cy - radius + 4, 11, CREAM, '900', 'center');
+  }
+  function wordmark() {
+    panel(28, 26, 234, 65, .91);
+    ctx.save(); ctx.beginPath(); ctx.arc(62, 57, 21, 0, TAU); ctx.clip();
+    circle(62, 57, 21, '#f7c384'); circle(61, 53, 12, '#ed8973');
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = '#29484a'; ctx.fillRect(40, 58 + i * 6, 45, 2 + i * .7); }
+    ctx.restore();
+    text('COPPER BAY', 92, 57, 23, CREAM, '900', 'left', 'Arial Black, Arial');
+    text('THE MERIDIAN FILES', 94, 74, 10, GOLD, '900');
   }
   function drawHud(state) {
     const pl = state.player, m = state.mission, story = currentMission(state), target = missionTarget(state);
-    const gradient = ctx.createLinearGradient(0, 0, 0, 180); gradient.addColorStop(0, '#0d2639c9'); gradient.addColorStop(1, '#0d263900'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1280, 180);
-    text('COPPER BAY', 30, 66, 43, CREAM, '900', 'left', 'Arial Black, Arial');
-    ctx.fillStyle = GOLD; ctx.fillRect(31, 80, 40, 3); label('THE MERIDIAN FILES', 82, 85, GOLD);
-    const hour = Math.floor(state.time), minute = Math.floor((state.time % 1) * 60);
-    label(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}  /  ${districtAt(pl.x, pl.y).tag}`, 31, 110);
-    if (!pl.car) { text('ON FOOT', 31, 156, 29, GOLD, '900'); label('MARA VALE', 32, 177, CREAM); }
-    text('$' + Math.floor(pl.money).toLocaleString('en-US'), 1246, 57, 32, MINT, '900', 'right');
-    for (let i = 0; i < 5; i++) text('★', 1102 + i * 31, 98, 28, i < Math.ceil(state.heat) ? GOLD : '#54717b', '900', 'center');
-    if (state.heat > 0) {
-      text(state.unseen > 3 ? 'SEARCHING · STAY OUT OF SIGHT' : 'PURSUIT ACTIVE', 1245, 120, 11, state.unseen > 3 ? MINT : '#ff9b93', '800', 'right');
-      ctx.fillStyle = '#244654'; ctx.fillRect(1090, 128, 155, 3); ctx.fillStyle = GOLD; ctx.fillRect(1090, 128, 155 * (1 - Math.min(1, state.unseen / (8 + Math.ceil(state.heat) * 2))), 3);
-    }
-    panel(1003, 147, 246, 66, .84);
-    label(pl.car ? VEHICLE_TYPES[pl.car.type].name : `MARA VALE  /  ${pl.weapon}`, 1016, 167, CREAM);
-    const health = pl.car ? clamp(pl.car.hp / VEHICLE_TYPES[pl.car.type].hp, 0, 1) : pl.health / 100;
-    ctx.fillStyle = '#48616c'; ctx.fillRect(1017, 178, 168, 6); ctx.fillStyle = MINT; ctx.fillRect(1017, 178, 168 * health, 6);
-    ctx.fillStyle = '#48616c'; ctx.fillRect(1017, 189, 168, 4); ctx.fillStyle = '#8abdea'; ctx.fillRect(1017, 189, 168 * pl.armor / 100, 4);
-    text(pl.car ? 'HP' : String(pl.ammo), 1233, 190, 19, CREAM, '900', 'right');
-    minimap(state);
+    wordmark();
     const district = districtAt(pl.x, pl.y);
-    text(district.tag, 133, 753, 16, CREAM, '900', 'center'); label(district.name, 133 - district.name.length * 3.1, 771, MUTED);
-    panel(260, 650, 760, 91, .94);
-    ctx.fillStyle = GOLD; ctx.fillRect(260, 660, 4, 71);
-    label(m.complete ? 'THE MERIDIAN FILES · COMPLETE' : `${String(Math.min(m.index + 1, 6)).padStart(2, '0')} / ${story.name}`, 280, 674, GOLD);
-    const objective = missionObjective(state); text(objective, 280, 708, objective.length > 58 ? 21 : 24, CREAM, '800');
-    if (target) text(Math.round(distance(pl, target)) + ' m', 1001, 674, 13, MUTED, '700', 'right');
-    if (m.timer > 0) text(`${Math.ceil(m.timer)}s`, 1000, 707, 22, '#ff9d86', '900', 'right');
+    const hour = String(Math.floor(state.time)).padStart(2, '0');
+    const minute = String(Math.floor((state.time % 1) * 60)).padStart(2, '0');
+    panel(28, 99, 234, 32, .87);
+    text(district.name, 41, 120, 14, CREAM, '900');
+    text(hour + ':' + minute, 249, 120, 13, GOLD, '900', 'right');
+
+    panel(1003, 26, 246, 126, .94);
+    text('$' + Math.floor(pl.money).toLocaleString('en-US'), 1230, 62, 32, MINT, '900', 'right');
+    for (let i = 0; i < 5; i++) text('★', 1040 + i * 43, 103, 31, i < Math.ceil(state.heat) ? GOLD : '#567276', '900', 'center');
+    const pursuit = state.unseen > 3 ? 'SEARCHING · STAY OUT OF SIGHT' : state.air && !state.air.departing ? 'PURSUIT · AIR ONE ACTIVE' : state.heat ? 'POLICE PURSUIT' : 'NO ACTIVE WARRANT';
+    text(pursuit, 1230, 130, 13, state.heat && state.unseen <= 3 ? '#ffa192' : '#c6d6c9', '900', 'right');
+
+    if (!state.garageOpen) {
+      panel(1003, 161, 246, 80, .91);
+      const car = pl.car;
+      label(car ? VEHICLE_TYPES[car.type].name : pl.weapon, 1017, 182, CREAM);
+      text(car ? (car.stolen ? 'STOLEN' : 'VEHICLE') : pl.ammo + ' RDS', 1233, 183, 15, GOLD, '900', 'right');
+      const health = car ? clamp(car.hp / VEHICLE_TYPES[car.type].hp, 0, 1) : pl.health / 100;
+      ctx.fillStyle = '#48616c'; ctx.fillRect(1065, 194, 165, 6); ctx.fillStyle = MINT; ctx.fillRect(1065, 194, 165 * health, 6);
+      ctx.fillStyle = '#48616c'; ctx.fillRect(1065, 217, 165, 4); ctx.fillStyle = '#8abdea'; ctx.fillRect(1065, 217, 165 * pl.armor / 100, 4);
+      label(car ? 'CAR HP' : 'HEALTH', 1017, 201);
+      label(car ? pl.weapon : 'ARMOR', 1017, 222);
+    }
+    minimap(state);
+    panel(28, 748, 193, 28, .94); text(district.tag, 124, 767, 13, CREAM, '900', 'center');
+    panel(245, 658, 789, 78, .94);
+    ctx.fillStyle = GOLD; ctx.fillRect(245, 669, 4, 55);
+    const chapter = String(Math.min(m.index + 1, STORY.length)).padStart(2, '0');
+    label(m.complete ? 'THE MERIDIAN FILES · COMPLETE' : 'CHAPTER ' + chapter + ' / ' + story.name, 270, 682, GOLD);
+    const objective = missionObjective(state);
+    text(objective, 270, 714, objective.length > 58 ? 21 : 24, CREAM, '800');
+    if (target) text(Math.round(distance(pl, target)) + ' m', 1013, 682, 13, MUTED, '700', 'right');
+    if (m.timer > 0) text(Math.ceil(m.timer) + 's', 1012, 714, 22, '#ff9d86', '900', 'right');
     const keys = pl.car ? [['WASD', 'drive', 47], ['SPACE', 'handbrake', 55], ['E', 'exit', 25], ['M', 'map', 25], ['ESC', 'pause', 39]] : [['WASD', 'move', 47], ['SHIFT', 'sprint', 47], ['E', 'steal / talk', 25], ['LMB', 'fire', 39], ['F', 'punch', 25], ['M', 'map', 25]];
-    let x = 274;
+    panel(245, 746, 789, 35, .89);
+    let x = 259;
     for (const [key, name, w] of keys) { keycap(key, x, 773, w); text(name, x + w + 7, 773, 12, CREAM, '700'); x += w + name.length * 6 + 27; }
     if (pl.car) {
       panel(1052, 655, 197, 118, .9);
       text(String(Math.round(Math.abs(pl.car.speed) * .23)).padStart(3, '0'), 1070, 717, 53, CREAM, '900'); label('KM/H', 1199, 715, MUTED);
-      const v = Math.abs(pl.car.speed) / VEHICLE_TYPES[pl.car.type].max;
+      const v = Math.abs(pl.car.speed) / topSpeed(pl.car);
       for (let i = 0; i < 14; i++) { ctx.fillStyle = i / 14 < v ? i > 10 ? '#ff967a' : MINT : '#2b4b58'; ctx.fillRect(1071 + i * 11, 737 - i * .5, 7, 15 + i * .5); }
     }
-    if (state.saved > 0) label('✓ LOCAL SAVE', 1146, 236, MINT);
-    if (state.toast.time > 0 && !m.briefing) {
+    if (state.trial) trialHud(state);
+    if (state.saved > 0 && !state.garageOpen) label('✓ LOCAL SAVE', 1146, 236, MINT);
+    if (state.toast.time > 0 && !m.briefing && !m.banner && !state.rankNotice?.time) {
       const w = Math.min(760, state.toast.text.length * 7 + 40); panel(640 - w / 2, 139, w, 38, .86); text(state.toast.text, 640, 164, 13, CREAM, '700', 'center');
     }
-    if (!pl.car && !m.briefing && !state.shopOpen) {
+    if ((!m.briefing || m.radio) && !state.shopOpen && !state.garageOpen) {
       let prompt = '';
-      if (!m.active && target && distance(pl, target) < 120) prompt = 'E   TALK TO ' + story.contact;
-      else if (state.cars.some(c => !c.wreck && distance(c, pl) < 90)) prompt = 'E   ENTER / STEAL CAR';
-      if (prompt) { panel(499, 551, 282, 40, .9); text(prompt, 640, 577, 15, GOLD, '900', 'center'); }
+      const nearbyCar = pl.car ? null : state.cars.filter(c => !c.wreck && distance(c, pl) < 90).sort((a, b) => distance(a, pl) - distance(b, pl))[0];
+      if (!m.active && target && distance(pl, target) < 120) prompt = 'Talk to ' + story.contact;
+      else if (nearGarage(state)) prompt = 'Ghost Customs';
+      else if (nearbyCar) prompt = (nearbyCar.getaway ? 'Take ' : nearbyCar.driver ? 'Steal ' : 'Enter ') + VEHICLE_TYPES[nearbyCar.type].name;
+      else if (nearbyTrial(state) && !state.trial) prompt = nearbyTrial(state).name;
+      if (prompt) {
+        panel(504, 581, 254, 41, .94); keycap('E', 516, 606, 23);
+        text(prompt, 548, 606, 16, CREAM, '800');
+      }
     }
   }
   function dialogue(state) {
     const story = currentMission(state), m = state.mission;
+    if (m.radio) {
+      panel(28, 161, 360, 157, .97);
+      ctx.fillStyle = GOLD; ctx.fillRect(28, 177, 4, 125);
+      text('RADIO  /  ' + story.contact, 46, 190, 15, GOLD, '900');
+      const words = story.dialogue[m.dialogue].split(' ');
+      let line = '', y = 229;
+      for (const word of words) {
+        if ((line + word).length > 31) { text(line, 46, y, 20, CREAM, '700'); line = ''; y += 25; }
+        line += word + ' ';
+      }
+      text(line, 46, y, 20, CREAM, '700');
+      keycap('↵', 46, 297, 24);
+      text('End / advance call', 81, 297, 13, MUTED, '700');
+      text((m.dialogue + 1) + ' / ' + story.dialogue.length, 369, 297, 13, MUTED, '800', 'right');
+      return;
+    }
     panel(34, 220, 425, 228, .96); ctx.fillStyle = GOLD; ctx.fillRect(34, 235, 4, 190);
     label((m.radio ? 'RADIO / ' : 'INCOMING / ') + story.contact, 57, 249, GOLD);
     text(story.name, 57, 284, story.name.length > 22 ? 22 : 27, CREAM, '900');
@@ -108,14 +171,12 @@ export function createHUD(p) {
     keycap('↵', 57, 424, 27); text(m.dialogue === story.dialogue.length - 1 ? (m.radio ? 'End call' : 'Accept job') : 'Continue conversation', 96, 424, 13, GOLD);
     text(`${m.dialogue + 1} / ${story.dialogue.length}`, 436, 424, 13, MUTED, '700', 'right');
   }
-  function cityMap(state) {
-    ctx.fillStyle = '#0b2438c9'; ctx.fillRect(0, 0, 1280, 800); panel(98, 40, 1084, 720, .97);
-    text('THE CITY IS YOURS.', 139, 105, 38, CREAM, '900'); label('COPPER BAY / CITY MAP', 140, 132, GOLD);
-    minimap(state, 474, 432, 260, true);
-    text('FOUR DISTRICTS.', 792, 222, 24, CREAM, '900');
-    DISTRICTS.forEach((d, i) => { text(String(i + 1).padStart(2, '0'), 795, 270 + i * 59, 15, d.color, '900'); text(d.name, 829, 270 + i * 59, 17, CREAM, '900'); label(d.tag, 829, 290 + i * 59); });
-    text('◆  Active mission', 795, 551, 16, GOLD); text('●  Shop / safehouse', 795, 582, 16, MINT); text('●  Police patrol', 795, 613, 16, '#87bded');
-    text('M / ESC   BACK TO THE STREETS', 139, 727, 14, GOLD, '900');
+  function trialHud(state) {
+    const run = state.trial, seconds = run.course.limit - run.time;
+    panel(28, 147, 256, 92, .95);
+    text(run.course.name, 42, 174, 20, MINT, '900');
+    text(seconds.toFixed(1) + 's', 42, 216, 31, CREAM, '900');
+    text('GATE ' + run.gate + ' / ' + (run.course.gates.length - 1), 270, 213, 14, GOLD, '900', 'right');
   }
   function title(state, hasSave) {
     const g = ctx.createLinearGradient(0, 0, 1100, 0); g.addColorStop(0, '#0a2537fa'); g.addColorStop(.48, '#0b2a3eea'); g.addColorStop(1, '#122d3b00'); ctx.fillStyle = g; ctx.fillRect(0, 0, 1280, 800);
@@ -141,21 +202,14 @@ export function createHUD(p) {
     button('resume', 'BACK TO THE BAY', 'ESC →', 247, 626, 352, true);
     if (state.screen === 'pause') button('save', state.heat > 0 ? 'LOSE HEAT TO SAVE' : 'SAVE GAME', 'K →', 632, 626, 352, false, state.heat > 0);
   }
-  function completion(state, large = false) {
+  function completion(state) {
     const m = state.mission;
-    if (large) {
-      ctx.fillStyle = '#0b2638b8'; ctx.fillRect(0, 0, 1280, 800);
-      panel(280, 154, 720, 485, .96); label('THE MERIDIAN FILES / CHAPTER CLOSED', 640 - 147, 198, MINT);
-      text('MISSION PASSED', 640, 266, 52, GOLD, '900', 'center'); text(m.lastName, 640, 312, 33, CREAM, '900', 'center');
-      text('+$' + m.lastPayout.toLocaleString('en-US'), 640, 380, 50, MINT, '900', 'center');
-      const stats = [[state.stats.missions + ' / 6', 'STORY JOBS'], [state.stats.carsStolen, 'CARS STOLEN'], [state.stats.takedowns, 'TAKEDOWNS']];
-      stats.forEach(([n, tag], i) => { const x = 426 + i * 213; text(String(n), x, 454, 31, CREAM, '900', 'center'); text(tag, x, 478, 11, MUTED, '900', 'center'); });
-      label('✓ PROGRESS SAVED TO THIS BROWSER', 640 - 126, 527, MINT);
-      button('resume', 'CONTINUE', 'ENTER →', 337, 558, 290, true);
-      button('new', 'NEW GAME', '↻', 653, 558, 290);
-    } else {
-      panel(397, 226, 486, 137, .94); text('MISSION PASSED', 640, 272, 32, GOLD, '900', 'center'); text(m.lastName, 640, 304, 19, CREAM, '900', 'center'); text('+$' + m.lastPayout.toLocaleString('en-US') + '  ·  PROGRESS SAVED', 640, 338, 17, MINT, '900', 'center');
-    }
+    panel(338, 28, 505, 114, .96);
+    ctx.fillStyle = GOLD; ctx.fillRect(338, 45, 4, 77);
+    text('MISSION PASSED', 359, 71, 32, GOLD, '900');
+    text(m.lastName, 359, 108, 19, CREAM, '800');
+    text('+$' + m.lastPayout.toLocaleString('en-US'), 822, 77, 35, MINT, '900', 'right');
+    text('+2 REPUTATION', 822, 107, 13, MINT, '900', 'right');
   }
   function death(state) {
     ctx.fillStyle = '#182237cf'; ctx.fillRect(0, 0, 1280, 800);
@@ -189,13 +243,17 @@ export function createHUD(p) {
     draw(state, hasSave, volume) {
       buttons.length = 0;
       if (state.screen === 'title') title(state, hasSave);
+      else if (state.mapOpen) drawMapScreen(p, state, { panel, keycap });
       else {
         drawHud(state);
         if (state.mission.briefing) dialogue(state);
-        if (state.mapOpen) cityMap(state);
         if (state.shopOpen) shop(state);
-        if (state.mission.banner > 0 && state.screen === 'play' && !state.mission.briefing) completion(state);
-        if (state.screen === 'complete') completion(state, true);
+        if (state.garageOpen) drawGarageScreen(p, state, { panel, buttons });
+        if (state.mission.banner > 0 && state.screen === 'play' && !state.mission.briefing && !state.mapOpen) completion(state);
+        if (state.rankNotice?.time > 0 && !state.mission.banner && !state.mapOpen) {
+          panel(452, 28, 376, 56, .94);
+          text('REPUTATION  /  ' + state.rankNotice.name, 640, 63, 21, GOLD, '900', 'center');
+        }
         if (state.screen === 'wasted' || state.screen === 'busted') death(state);
         if (state.screen === 'ending') ending(state);
       }

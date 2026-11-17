@@ -1,53 +1,48 @@
-import { ROAD_CENTERS, CITY_SIZE } from './city.js';
+import { ROAD_CENTERS } from './city.js';
+import { drawWaterfront, drawPromenade } from './waterfront-art.js';
+import { drawPortGround } from './landmarks.js';
 import { hash, TAU } from './math.js';
 import { tint } from './painter.js';
 export function drawCityGround(p, state) {
   const { ctx, project, poly, ground, line, visible } = p;
-  ctx.fillStyle = state.night > .5 ? '#173645' : '#39727a'; ctx.fillRect(0, 0, 1280, 800);
-  // Sea and little gold reflections extend beyond the explorable coastline.
-  for (let i = 0; i < 90; i++) {
-    const x = -500 + hash(i, 6) * 900, y = hash(i, 3) * 4900;
-    line(x, y, x + 30 + hash(i, 5) * 70, y, '#629e9d66', 1);
-  }
-  ground(190, 190, 3790, 3790, state.night > .5 ? '#627c7c' : '#b5b09a');
-  // Seawall and boardwalk.
-  ground(163, 170, 27, 3800, '#b5b59d', 5); ground(190, 3945, 3780, 27, '#c0b397', 5);
-  for (let y = 200; y < 3900; y += 25) line(165, y, 191, y, '#7d8a83', 1, 6);
-  for (let i = 0; i < 4; i++) {
-    const y = 2720 + i * 260;
-    ground(-155, y, 345, 85, '#7f8f86', 8);
-    for (let k = 0; k < 12; k++) line(-150 + k * 28, y, -150 + k * 28, y + 85, '#536f72', 1, 9);
-    ground(-85, y + 105, 115, 43, '#eef2dc', 5); ground(-65, y + 115, 70, 23, '#3d6877', 11);
-  }
+  drawWaterfront(p, state);
+  ground(190, 190, 3790, 3790, '#ddc4a3');
+  ground(188, 3945, 3782, 27, '#d0aa82', 5);
+  drawPortGround(p);
+  drawPromenade(p);
   for (const c of ROAD_CENTERS) {
-    ground(c - 75, 190, 150, 3790, '#273f4d'); ground(190, c - 75, 3790, 150, '#273f4d');
-    line(c - 76, 200, c - 76, 3940, '#cbd2b2', 2); line(c + 76, 200, c + 76, 3940, '#cbd2b2', 2);
-    line(200, c - 76, 3940, c - 76, '#cbd2b2', 2); line(200, c + 76, 3940, c + 76, '#cbd2b2', 2);
+    ground(c - 75, 190, 150, 3790, '#555d62'); ground(190, c - 75, 3790, 150, '#555d62');
+    line(c - 76, 200, c - 76, 3940, '#f4dfb8', 2); line(c + 76, 200, c + 76, 3940, '#f4dfb8', 2);
+    line(200, c - 76, 3940, c - 76, '#f4dfb8', 2); line(200, c + 76, 3940, c + 76, '#f4dfb8', 2);
     for (let v = 200; v < 3940; v += 52) {
       if (ROAD_CENTERS.some(r => Math.abs(v - r) < 105)) continue;
-      line(c - 3, v, c - 3, v + 27, '#e2b56c', 1.3); line(c + 3, v, c + 3, v + 27, '#e2b56c', 1.3);
-      line(v, c - 3, v + 27, c - 3, '#e2b56c', 1.3); line(v, c + 3, v + 27, c + 3, '#e2b56c', 1.3);
+      line(c - 3, v, c - 3, v + 27, '#e9c67e', 1.3); line(c + 3, v, c + 3, v + 27, '#e9c67e', 1.3);
+      line(v, c - 3, v + 27, c - 3, '#e9c67e', 1.3); line(v, c + 3, v + 27, c + 3, '#e9c67e', 1.3);
       line(c - 54, v, c - 54, v + 27, '#b9cac74a', 1); line(c + 54, v, c + 54, v + 27, '#b9cac74a', 1);
       line(v, c - 54, v + 27, c - 54, '#b9cac74a', 1); line(v, c + 54, v + 27, c + 54, '#b9cac74a', 1);
     }
   }
   for (const x of ROAD_CENTERS) for (const y of ROAD_CENTERS) {
     if (!visible(x, y, 180)) continue;
-    ground(x - 72, y - 72, 144, 144, '#2b4351');
+    ground(x - 72, y - 72, 144, 144, '#5b6267');
     for (let k = -56; k <= 56; k += 16) {
-      ground(x + k, y - 104, 9, 27, '#d7d6bf'); ground(x + k, y + 77, 9, 27, '#d7d6bf');
-      ground(x - 104, y + k, 27, 9, '#d7d6bf'); ground(x + 77, y + k, 27, 9, '#d7d6bf');
+      ground(x + k, y - 104, 9, 27, '#f5e5bf'); ground(x + k, y + 77, 9, 27, '#f5e5bf');
+      ground(x - 104, y + k, 27, 9, '#f5e5bf'); ground(x + 77, y + k, 27, 9, '#f5e5bf');
     }
     line(x - 70, y - 112, x - 8, y - 112, '#c5d1c7', 2);
     line(x + 70, y + 112, x + 8, y + 112, '#c5d1c7', 2);
     // Small turn arrows and traffic islands make the junctions legible.
-    poly([project(x - 33, y - 145), project(x - 42, y - 130), project(x - 25, y - 130)], '#c6cdb7');
-    poly([project(x + 33, y + 145), project(x + 42, y + 130), project(x + 25, y + 130)], '#c6cdb7');
+    poly([project(x - 33, y - 145), project(x - 42, y - 130), project(x - 25, y - 130)], '#eadac0');
+    poly([project(x + 33, y + 145), project(x + 42, y + 130), project(x + 25, y + 130)], '#eadac0');
   }
   for (const park of state.city.parks) {
-    ground(park.x, park.y, park.w, park.d, '#4a7771');
-    ground(park.x + 119, park.y + 8, 30, 264, '#a8a88c');
-    ground(park.x + 8, park.y + 119, 264, 30, '#a8a88c');
+    if (park.plaza) {
+      drawBeachPlaza(p, park);
+      continue;
+    }
+    ground(park.x, park.y, park.w, park.d, '#85a77b');
+    ground(park.x + 119, park.y + 8, 30, 264, '#d6bf98');
+    ground(park.x + 8, park.y + 119, 264, 30, '#d6bf98');
     p.prism(park.x + 103, park.y + 103, 62, 62, 8, '#b9c9ad', '#829e94', '#698c89');
     ground(park.x + 111, park.y + 111, 46, 46, '#62c9c0', 9);
     const q = project(park.x + 134, park.y + 134, 16); p.glow(q.x, q.y, 35, '#81e8dc', .25);
@@ -61,23 +56,24 @@ export function drawCityGround(p, state) {
 }
 export function drawBuilding(p, b, state) {
   const { ctx, project, poly, ground, line, prism } = p;
-  const light = 1 - state.night * .23;
-  ground(b.x + 28, b.y + 34, b.w, b.d, '#122b3c55');
-  prism(b.x, b.y, b.w, b.d, b.h, tint(b.roof, light), tint(b.color, light * .88), tint(b.color, light * .66));
+  const light = 1 - state.night * .20;
+  ground(b.x - 12, b.y - 12, b.w + 24, b.d + 24, '#ede0bc', 1, '#9e856842');
+  prism(b.x, b.y, b.w, b.d, b.h, tint(b.roof, light * 1.17), tint(b.color, light * 1.02), tint(b.color, light * .72));
   // Colored shop-front panels, lit windows, and repeated floors on both visible walls.
   for (let f = 0; f < b.floors; f++) {
     const z = 12 + f * 23;
     for (let k = 15; k < b.w - 12; k += 24) {
-      const color = hash(b.id * 3 + k, f) > .35 ? (f === 0 ? b.neon : '#ffdc9b') : '#315465';
+      const color = hash(b.id * 3 + k, f) > .35 ? (f === 0 || state.night > .35 ? '#ffdc9b' : '#729a9b') : '#3b606c';
       poly([project(b.x + k, b.y + b.d + .4, z), project(b.x + k + 13, b.y + b.d + .4, z), project(b.x + k + 13, b.y + b.d + .4, z + 11), project(b.x + k, b.y + b.d + .4, z + 11)], color);
     }
     for (let k = 17; k < b.d - 10; k += 30) {
-      const color = hash(b.id + k, f * 7) > .5 ? '#eacfa0' : '#284c5d';
+      const color = hash(b.id + k, f * 7) > .5 ? (state.night > .35 ? '#eacfa0' : '#6a9295') : '#3b5668';
       poly([project(b.x + b.w + .4, b.y + k, z), project(b.x + b.w + .4, b.y + k + 14, z), project(b.x + b.w + .4, b.y + k + 14, z + 11), project(b.x + b.w + .4, b.y + k, z + 11)], color);
     }
   }
   line(b.x, b.y + b.d, b.x + b.w, b.y + b.d, '#f8d0a2', 2, b.h + 1);
   line(b.x + b.w, b.y, b.x + b.w, b.y + b.d, '#e5b795', 2, b.h + 1);
+  if (b.variant === 'deco') drawDecoTrim(p, b);
   // Parapets, rooftop utility rooms, fans and ducting.
   ground(b.x + 7, b.y + 7, b.w - 14, b.d - 14, tint(b.roof, light * .88), b.h + 1, '#d6bca177');
   prism(b.x + 16, b.y + 18, Math.min(53, b.w - 30), 42, 10, '#8ca3a1', '#657e83', '#4c6775', b.h + 2);
@@ -145,15 +141,16 @@ export function drawBuilding(p, b, state) {
   }
 }
 export function drawPalm(p, t) {
-  const { ctx, project, line, poly } = p;
-  const h = t.park ? 37 : 56, q = project(t.x, t.y, h), base = project(t.x, t.y);
-  poly([project(t.x, t.y), project(t.x + 40, t.y + 26), project(t.x + 48, t.y + 20)], '#153a3f33');
-  ctx.strokeStyle = '#8a8b67'; ctx.lineWidth = 5 * p.view.zoom; ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.quadraticCurveTo(base.x - 5, base.y - h * .5 * p.view.zoom, q.x + 3, q.y); ctx.stroke();
+  const { ctx, project, poly } = p;
+  const h = t.coastal ? 82 + hash(t.x, t.y) * 22 : t.park ? 39 + hash(t.x, t.y) * 16 : 55 + hash(t.x, t.y) * 22;
+  const q = project(t.x - 5, t.y + 5, h), base = project(t.x, t.y);
+  ctx.strokeStyle = '#9e7e58'; ctx.lineWidth = 5 * p.view.zoom; ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.quadraticCurveTo(base.x - 5, base.y - h * .5 * p.view.zoom, q.x + 3, q.y); ctx.stroke();
   p.circle(q.x, q.y, 7 * p.view.zoom, '#376e63');
   for (let k = 0; k < 7; k++) {
     const a = k * TAU / 7 + hash(t.x, t.y) * 3;
-    const dx = Math.cos(a) * 29 * p.view.zoom, dy = Math.sin(a) * 15 * p.view.zoom;
-    poly([{ x: q.x, y: q.y }, { x: q.x + dx * .6 - dy * .3, y: q.y + dy * .4 - 8 }, { x: q.x + dx, y: q.y + dy + 7 }, { x: q.x + dx * .45 + dy * .2, y: q.y + dy * .7 }], k % 2 ? '#407f6b' : '#66a07c');
+    const width = (t.coastal ? 45 : 32) * p.view.zoom;
+    const dx = Math.cos(a) * width, dy = Math.sin(a) * width * .54;
+    poly([{ x: q.x, y: q.y }, { x: q.x + dx * .6 - dy * .3, y: q.y + dy * .4 - 8 }, { x: q.x + dx, y: q.y + dy + 7 }, { x: q.x + dx * .45 + dy * .2, y: q.y + dy * .7 }], k % 2 ? '#347b63' : '#78ab65');
   }
 }
 export function drawLamp(p, lamp, state) {
@@ -173,4 +170,40 @@ export function drawStreetProp(p, prop, state) {
     p.prism(prop.x, prop.y, 28, 13, 8, '#bf9b7b', '#7f7e71', '#616e6c');
     p.prism(prop.x + 40, prop.y + 5, 11, 11, 14, '#7e9d91', '#496d68', '#345a60');
   }
+}
+
+function drawBeachPlaza(p, park) {
+  const { x, y, w, d } = park;
+  p.ground(x - 15, y - 15, w + 30, d + 30, '#e8c59a', 0, '#fcdfb5');
+  for (let a = 0; a <= w; a += 23) p.line(x + a, y - 10, x + a, y + d + 10, '#ac735839', 1);
+  for (let a = 0; a <= d; a += 23) p.line(x - 10, y + a, x + w + 10, y + a, '#ac735839', 1);
+  for (const side of [16, w - 54]) {
+    for (const off of [18, d - 60]) {
+      p.prism(x + side, y + off, 38, 39, 8, '#779a65', '#bc9678', '#b28970');
+      p.ground(x + side + 4, y + off + 4, 30, 31, '#92a36b', 9);
+    }
+  }
+  const center = p.project(x + 194, y + 112, 1), z = p.view.zoom;
+  for (const [r, color] of [[57, '#ac8673'], [54, '#fcdfb8'], [47, '#53b9ab'], [38, '#80d3bd'], [25, '#53abac']]) {
+    p.ctx.fillStyle = color; p.ctx.beginPath(); p.ctx.ellipse(center.x, center.y, r * z, r * .52 * z, 0, 0, TAU); p.ctx.fill();
+  }
+  p.circle(center.x, center.y - 5, 10 * z, '#f0ddbf');
+  for (let i = 0; i < 10; i++) {
+    const a = i * TAU / 10;
+    p.ctx.strokeStyle = '#ddf7d9c0'; p.ctx.lineWidth = 1.5;
+    p.ctx.beginPath(); p.ctx.moveTo(center.x, center.y - 8);
+    p.ctx.quadraticCurveTo(center.x + Math.cos(a) * 28 * z, center.y - 24 * z, center.x + Math.cos(a) * 37 * z, center.y + Math.sin(a) * 18 * z); p.ctx.stroke();
+  }
+}
+
+function drawDecoTrim(p, b) {
+  const { x, y, w, d, h } = b;
+  const facade = y + d + 1;
+  for (let z = 23; z < h; z += 23) {
+    p.line(x, facade, x + w, facade, '#fff0cd', 2.1, z);
+    p.line(x + w + 1, y, x + w + 1, facade, '#e8caac', 1.5, z);
+  }
+  for (const offset of [5, w * .5, w - 8]) p.prism(x + offset, facade, 4, 5, h + 3, '#fff0ce', '#ffe1ac', '#c6967f');
+  p.prism(x + w * .37, y + d - 58, w * .26, 58, 10, '#fff0cf', '#ead1a4', '#bc9a82', h + 1);
+  p.prism(x + w * .44, y + d - 50, w * .12, 48, 9, '#fff3cc', '#f8dfb3', '#be9984', h + 11);
 }

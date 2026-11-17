@@ -1,11 +1,14 @@
 import { distance, clamp, TAU } from './math.js';
-import { ROAD_CENTERS, roadDistance } from './city.js';
+import { ROAD_CENTERS } from './city.js';
 export function spawnPedestrians() {
   const peds = [];
   const shirts = ['#ea8c75', '#f2d5aa', '#6ec2bd', '#ddbc64', '#b398cf', '#8297b8'];
   for (let i = 0; i < 165; i++) {
     const vertical = i % 2, road = ROAD_CENTERS[i % 8], cross = 300 + ((i * 193) % 3500);
     peds.push({ x: vertical ? road + (i % 3 ? 95 : -96) : cross, y: vertical ? cross : road + (i % 3 ? 97 : -95), angle: vertical ? (i % 3 ? Math.PI / 2 : -Math.PI / 2) : (i % 3 ? 0 : Math.PI), hp: 65, flee: 0, color: shirts[i % 6], seed: i, police: false, enemy: false, cooldown: 0 });
+  }
+  for (let i = 0; i < 34; i++) {
+    peds.push({ x: 176 + (i % 4) * 13, y: 340 + i * 59, angle: i % 2 ? Math.PI / 2 : -Math.PI / 2, hp: 65, flee: 0, color: shirts[i % shirts.length], seed: 170 + i, police: false, enemy: false, cooldown: 0 });
   }
   return peds;
 }
@@ -79,8 +82,9 @@ export function updateCombat(state, dt) {
 export function updatePedestrians(state, dt) {
   const p = state.player;
   for (const ped of state.peds) {
-    if (ped.hp <= 0) continue;
+    if (ped.hp <= 0 || ped.sceneActor) continue;
     ped.cooldown = Math.max(0, (ped.cooldown || 0) - dt);
+    ped.muzzle = Math.max(0, (ped.muzzle || 0) - dt);
     const dist = distance(ped, p);
     if (ped.police || ped.enemy) {
       if (dist < 700 && (ped.enemy || state.heat > 0)) {
@@ -89,7 +93,7 @@ export function updatePedestrians(state, dt) {
           const x = ped.x + Math.cos(ped.angle) * dt * 90, y = ped.y + Math.sin(ped.angle) * dt * 90;
           if (!state.city.blocked(x, y, 7)) { ped.x = x; ped.y = y; }
         }
-        if (dist < 340 && ped.cooldown <= 0 && !state.city.blocked((p.x + ped.x) / 2, (p.y + ped.y) / 2, 0)) { fireWeapon(state, ped.x, ped.y, ped.angle + (Math.sin(state.elapsed * 3 + ped.seed) * .14), 'enemy'); ped.cooldown = ped.enemy ? 1.2 : 1.8; }
+        if (dist < 340 && ped.cooldown <= 0 && !state.city.blocked((p.x + ped.x) / 2, (p.y + ped.y) / 2, 0)) { fireWeapon(state, ped.x, ped.y, ped.angle + (Math.sin(state.elapsed * 3 + ped.seed) * .14), 'enemy'); ped.cooldown = ped.enemy ? 1.2 : 1.8; ped.muzzle = .085; }
         if (ped.police && dist < 30 && !p.car) { state.bust += dt; if (state.bust > 3) state.screen = 'busted'; }
       }
       continue;
@@ -101,7 +105,7 @@ export function updatePedestrians(state, dt) {
     const nx = ped.x + Math.cos(ped.angle) * speed * dt, ny = ped.y + Math.sin(ped.angle) * speed * dt;
     if (!state.city.blocked(nx, ny, 7)) { ped.x = nx; ped.y = ny; }
     else ped.angle += Math.PI / 2;
-    if (ped.x < 230 || ped.y < 230 || ped.x > 3870 || ped.y > 3870) { ped.angle += Math.PI; ped.x = clamp(ped.x, 235, 3865); ped.y = clamp(ped.y, 235, 3865); }
+    if (ped.y < 230 || ped.y > 3870) { ped.angle += Math.PI; ped.y = clamp(ped.y, 235, 3865); }
   }
   state.bust = Math.max(0, state.bust - dt * .25);
 }
