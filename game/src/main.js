@@ -1,134 +1,91 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
-import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+import { createWorld, updateWorld, interact, buyItem } from './world.js';
+import { createRenderer } from './render.js';
+import { createInput } from './input.js';
+import { createAudio } from './audio.js';
+import { readSave, writeSave, readSettings, saveSettings } from './save.js';
+import { advanceBriefing, startBriefing } from './missions.js';
 import { stageShot } from './shots.js';
-
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
-
-const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
-const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
-
+import { lerp, clamp } from './math.js';
 const canvas = document.getElementById('game');
-const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
-
-function readBest() {
-  try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
-  } catch {
-    return 0;
-  }
+const renderer = createRenderer(canvas), input = createInput(canvas), audio = createAudio();
+const settings = readSettings(); audio.setVolume(settings.volume);
+let save = readSave(), state = createWorld(audio), last = performance.now(), accumulator = 0;
+const shot = new URLSearchParams(location.search).get('shot');
+function start(continuing = false) {
+  state = createWorld(audio, continuing ? readSave() : null); state.screen = 'play';
+  audio.unlock(); audio.sound('click');
+  if (!continuing) { startBriefing(state); writeSave(state); }
+  save = readSave(); document.getElementById('status').textContent = 'Welcome to Copper Bay. Playing as Mara Vale.';
 }
-
-function saveBest(value) {
-  try {
-    window.localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
-  }
+function action(id) {
+  audio.unlock();
+  if (id === 'new') start(false);
+  if (id === 'continue') start(true);
+  if (id === 'controls') state.settingsOpen = !state.settingsOpen;
+  if (id === 'resume') { state.settingsOpen = false; if (state.screen !== 'title') state.screen = 'play'; }
+  if (id === 'restart') { start(!!readSave()); state.heat = 0; state.player.health = 100; state.player.money = Math.max(0, state.player.money - 150); state.mission.briefing = false; state.player.x = 855; state.player.y = 790; state.camera.x = 855; state.camera.y = 790; }
+  if (id === 'save' && state.heat === 0) { writeSave(state); save = readSave(); }
+  if (id === 'louder' || id === 'quieter') { settings.volume = clamp(settings.volume + (id === 'louder' ? .1 : -.1), 0, 1); audio.setVolume(settings.volume); saveSettings(settings); }
+  if (['ammo', 'armor', 'health', 'shotgun'].includes(id)) buyItem(state, id);
+  if (id === 'closeShop') state.shopOpen = false;
 }
-
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
+function handleInput() {
+  if (input.take('Escape') || input.take('KeyP')) {
+    if (state.settingsOpen) state.settingsOpen = false;
+    else if (state.shopOpen) state.shopOpen = false;
+    else if (state.mapOpen) state.mapOpen = false;
+    else if (state.screen === 'play') state.screen = 'pause';
+    else if (state.screen === 'pause') state.screen = 'play';
   }
-  requestAnimationFrame(paint);
+  if (input.take('KeyC') && state.screen === 'title') state.settingsOpen = !state.settingsOpen;
+  if (input.take('Enter')) {
+    if (state.settingsOpen) action('resume');
+    else if (state.screen === 'title') action('new');
+    else if (state.screen === 'wasted' || state.screen === 'busted') action('restart');
+    else if (state.screen === 'complete' || state.screen === 'ending' || state.screen === 'pause') action('resume');
+    else if (state.mission.briefing) advanceBriefing(state);
+  }
+  if (state.screen === 'play') {
+    if (input.take('KeyE')) interact(state);
+    if (input.take('Tab') && state.mission.active) { state.mission.briefing = true; state.mission.radio = true; state.mission.dialogue = 0; }
+    if (input.take('KeyM')) state.mapOpen = !state.mapOpen;
+    if (input.take('KeyK')) {
+      if (state.heat === 0) { writeSave(state); save = readSave(); }
+      else state.toast = { text: 'Lose the heat before saving', time: 3 };
+    }
+    if (input.take('Digit1')) state.player.weapon = 'PISTOL';
+    if (input.take('Digit2')) state.player.weapon = 'FISTS';
+    if (input.take('Digit3')) { if (state.player.shotgun) state.player.weapon = 'SCATTERGUN'; else state.toast = { text: 'Find a weapon cache or visit Night Owl Supply for a scattergun', time: 4 }; }
+  }
+  if (input.pointer.clicked) {
+    const b = renderer.buttons.find(b => input.pointer.x >= b.x && input.pointer.x <= b.x + b.w && input.pointer.y >= b.y && input.pointer.y <= b.y + b.h);
+    if (b) { action(b.id); input.pointer.down = false; }
+    else if (state.mission.briefing) { advanceBriefing(state); input.pointer.down = false; }
+  }
+  input.clear();
 }
-
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
-
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
-  }
-
-  function startGame() {
-    world.reset();
-    accumulator = 0;
-    screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
-  }
-
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
-    }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
-    }
-  }
-
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
-      }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
-  });
-
-  announce('Block Dodger. Press Space or click to start.');
+function frame(now) {
   requestAnimationFrame(frame);
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  handleInput(); state.pointer = input.pointer;
+  if (state.screen === 'title') { state.elapsed += dt; state.camera.x = 1730 + Math.sin(state.elapsed * .045) * 90; state.camera.y = 1650 + Math.cos(state.elapsed * .045) * 90; }
+  const aim = renderer.unproject(input.pointer.x, input.pointer.y + 17);
+  const old = { x: state.player.x, y: state.player.y };
+  accumulator += dt;
+  while (accumulator >= 1 / 60) { updateWorld(state, input, aim, 1 / 60); accumulator -= 1 / 60; }
+  state.walking = Math.hypot(state.player.x - old.x, state.player.y - old.y) > .1;
+  if (state.screen !== 'title') {
+    const car = state.player.car, look = car ? Math.min(140, Math.abs(car.speed) * .3) : 0;
+    const x = state.player.x + Math.cos(state.player.angle) * look, y = state.player.y + Math.sin(state.player.angle) * look;
+    state.camera.x = lerp(state.camera.x, x, 1 - Math.exp(-dt * 5)); state.camera.y = lerp(state.camera.y, y, 1 - Math.exp(-dt * 5)); state.camera.zoom = lerp(state.camera.zoom, car ? 1 : 1.22, dt * 2);
+  }
+  audio.update(dt, state); renderer.draw(state, !!save, settings.volume);
 }
-
-if (shot) runShot(shot);
-else runGame();
+if (shot) {
+  stageShot(state, shot); renderer.draw(state, true, settings.volume); window.__shotReady = true;
+} else {
+  state.camera = { x: 1730, y: 1730, zoom: 1.06 }; requestAnimationFrame(frame);
+}
+window.addEventListener('blur', () => { if (!shot && state.screen === 'play') state.screen = 'pause'; });
+// Read-only inspection for local QA and accessible state announcements.
+window.copperBay = { get state() { return state; }, get ready() { return true; } };

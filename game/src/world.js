@@ -1,124 +1,91 @@
-// The game's rules and state, with no drawing and no browser in it: the player's paddle, the
-// pool of falling blocks and coins, spawning, collisions, score, lives and level. step() advances
-// one fixed step and returns what happened as bit flags, so the caller can react without the
-// world knowing about screens or sound. Nothing here allocates after createWorld returns.
-import { BLOCK, COIN, FIELD, LEVEL, LIVES, PLAYER, POOL_SIZE } from './config.js';
-
-export const KIND_BLOCK = 0;
-export const KIND_COIN = 1;
-
-export const EVENT_HIT = 1;
-export const EVENT_COIN = 2;
-export const EVENT_OVER = 4;
-
-function overlaps(a, b) {
-  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+import { clamp, distance } from './math.js';
+import { createCity, PLACES } from './city.js';
+import { spawnTraffic, makeCar, moveCar, interactWithCar, updateTraffic, updateCarCollisions } from './vehicles.js';
+import { createEffects } from './effects.js';
+import { spawnPedestrians, updatePedestrians, updateCombat, fireWeapon, punch } from './combat.js';
+import { commitCrime, updatePolice } from './police.js';
+import { createMissionState, updateMissions, missionTarget, startBriefing, advanceBriefing } from './missions.js';
+import { writeSave } from './save.js';
+export function createWorld(audio, save = null) {
+  const city = createCity();
+  const state = {
+    city, audio, screen: 'title', elapsed: 0, time: save?.time || 17.8, heat: 0, lastCrime: -100, unseen: 0, policeTimer: 2, bust: 0, shake: 0, saved: 0,
+    player: { x: save?.x || 855, y: save?.y || 790, health: 100, armor: save?.armor ?? 50, ammo: save?.ammo ?? 120, money: save?.money ?? 350, angle: -Math.PI / 2, car: null, cooldown: 0, punch: 0, muzzle: 0, invincible: 0, weapon: 'PISTOL', shotgun: save?.shotgun || false },
+    cars: spawnTraffic(), peds: spawnPedestrians(), bullets: [], pickups: [
+      { x: 895, y: 1280, kind: 'ammo', value: 50 }, { x: 1855, y: 2240, kind: 'health', value: 50 },
+      { x: 895, y: 3200, kind: 'weapon', value: 30 }, { x: 2720, y: 895, kind: 'ammo', value: 60 },
+      { x: 3200, y: 1855, kind: 'cash', value: 400 }, { x: 1280, y: 2815, kind: 'cash', value: 300 },
+    ], roadblocks: [], effects: createEffects(),
+    mission: createMissionState(save?.mission || 0),
+    stats: save?.stats || { carsStolen: 0, takedowns: 0, wrecks: 0, missions: 0, policeSpawned: 0, distance: 0 },
+    toast: { text: 'Welcome home, Mara · Meet Inez at your garage', time: 6 },
+    camera: { x: save?.x || 855, y: save?.y || 790, zoom: 1 }, mapOpen: false, shopOpen: false, settingsOpen: false, autosave: 0,
+  };
+  state.crime = severity => commitCrime(state, severity);
+  state.addCar = (...args) => { const car = makeCar(...args); state.cars.push(car); return car; };
+  if (save?.mission >= 6) state.mission.complete = true;
+  if (city.blocked(state.player.x, state.player.y, 10)) { state.player.x = 855; state.player.y = 790; }
+  return state;
 }
-
-export function createWorld(random) {
-  const player = { x: 0, y: FIELD.groundY - PLAYER.height, width: PLAYER.width, height: PLAYER.height, invulnerable: 0 };
-  const items = [];
-  for (let index = 0; index < POOL_SIZE; index += 1) {
-    items.push({ active: false, kind: KIND_BLOCK, x: 0, y: 0, width: 0, height: 0, speed: 0 });
-  }
-  const state = { player, items, score: 0, lives: LIVES, level: 1, elapsed: 0, blockTimer: 0, coinTimer: 0 };
-
-  function reset() {
-    player.x = (FIELD.width - player.width) / 2;
-    player.invulnerable = 0;
-    for (const item of items) item.active = false;
-    state.score = 0;
-    state.lives = LIVES;
-    state.level = 1;
-    state.elapsed = 0;
-    state.blockTimer = BLOCK.interval;
-    state.coinTimer = COIN.interval;
-  }
-
-  function freeItem() {
-    for (let index = 0; index < items.length; index += 1) if (!items[index].active) return items[index];
-    return null;
-  }
-
-  function spawnBlock() {
-    const item = freeItem();
-    if (item === null) return;
-    item.active = true;
-    item.kind = KIND_BLOCK;
-    item.width = BLOCK.minWidth + random() * (BLOCK.maxWidth - BLOCK.minWidth);
-    item.height = BLOCK.height;
-    item.x = random() * (FIELD.width - item.width);
-    item.y = -item.height;
-    item.speed = BLOCK.speed + BLOCK.speedPerLevel * (state.level - 1) + random() * BLOCK.speedJitter;
-  }
-
-  function spawnCoin() {
-    const item = freeItem();
-    if (item === null) return;
-    item.active = true;
-    item.kind = KIND_COIN;
-    item.width = COIN.size;
-    item.height = COIN.size;
-    item.x = random() * (FIELD.width - item.width);
-    item.y = -item.height;
-    item.speed = COIN.speed + COIN.speedPerLevel * (state.level - 1);
-  }
-
-  function blockInterval() {
-    return Math.max(BLOCK.minInterval, BLOCK.interval * BLOCK.intervalScale ** (state.level - 1));
-  }
-
-  /**
-   * One fixed step. `direction` is -1, 0 or 1 (left, still, right). With `harmless` set (the title
-   * screen's backdrop) things fall but nothing touches the player and nothing scores.
-   */
-  function step(dt, direction, harmless) {
-    let events = 0;
-    state.elapsed += dt;
-    state.level = Math.min(LEVEL.max, 1 + Math.floor(state.elapsed / LEVEL.seconds));
-
-    player.x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * dt));
-    if (player.invulnerable > 0) player.invulnerable = Math.max(0, player.invulnerable - dt);
-
-    state.blockTimer -= dt;
-    if (state.blockTimer <= 0) {
-      spawnBlock();
-      state.blockTimer += blockInterval();
+export function interact(state) {
+  if (state.mission.briefing) { advanceBriefing(state); return; }
+  if (state.shopOpen) { state.shopOpen = false; return; }
+  const p = state.player, m = state.mission, target = missionTarget(state);
+  if (!m.active && !m.complete && target && distance(p, target) < 120) { startBriefing(state); return; }
+  if (!p.car) {
+    for (const key of ['shop', 'clinic']) if (distance(p, PLACES[key]) < 115) {
+      if (key === 'shop') { state.shopOpen = true; return; }
+      if (key === 'clinic') { if (p.money >= 100) { p.money -= 100; p.health = 100; state.toast = { text: 'BAY CLINIC · Health restored −$100', time: 3 }; } else state.toast = { text: 'Clinic · $100 required', time: 3 }; return; }
+      if (key === 'home') { writeSave(state); state.toast = { text: 'HOME SAFE · Progress saved', time: 3 }; return; }
     }
-    state.coinTimer -= dt;
-    if (state.coinTimer <= 0) {
-      spawnCoin();
-      state.coinTimer += COIN.interval + random() * COIN.intervalJitter;
-    }
-
-    for (let index = 0; index < items.length; index += 1) {
-      const item = items[index];
-      if (!item.active) continue;
-      item.y += item.speed * dt;
-      if (item.y > FIELD.groundY) {
-        item.active = false;
-        if (item.kind === KIND_BLOCK && !harmless) state.score += BLOCK.dodgePoints;
-        continue;
-      }
-      if (harmless || !overlaps(item, player)) continue;
-      if (item.kind === KIND_COIN) {
-        item.active = false;
-        state.score += COIN.points;
-        events |= EVENT_COIN;
-      } else if (player.invulnerable === 0) {
-        item.active = false;
-        state.lives -= 1;
-        player.invulnerable = PLAYER.invulnerable;
-        events |= EVENT_HIT;
-        if (state.lives === 0) {
-          events |= EVENT_OVER;
-          break;
-        }
-      }
-    }
-    return events;
   }
-
-  reset();
-  return { state, reset, step };
+  if (p.car && distance(p, PLACES.garage) < 130 && p.money >= 250) {
+    p.money -= 250; p.car.hp = 150; p.car.color = ['#f58a69', '#62d6c3', '#d7b26b'][Math.floor(state.elapsed) % 3]; state.heat = 0;
+    state.toast = { text: 'GHOST CUSTOMS · Repaired, resprayed, heat cleared −$250', time: 4 }; return;
+  }
+  if (interactWithCar(state)) return;
+  if (!p.car && distance(p, PLACES.home) < 115) { writeSave(state); state.toast = { text: 'HOME SAFE · Progress saved', time: 3 }; return; }
+  state.toast = { text: 'Find a car, contact, safehouse or shop · M opens the city map', time: 3 };
+}
+export function buyItem(state, item) {
+  const p = state.player, price = item === 'ammo' ? 80 : item === 'armor' ? 180 : item === 'shotgun' ? 650 : 100;
+  if (p.money < price) { state.toast = { text: 'Not enough cash. Finish a job or collect a drop.', time: 3 }; return; }
+  p.money -= price;
+  if (item === 'ammo') p.ammo += 60;
+  if (item === 'armor') p.armor = 100;
+  if (item === 'health') p.health = 100;
+  if (item === 'shotgun') { p.shotgun = true; p.weapon = 'SCATTERGUN'; p.ammo += 30; }
+  state.audio.sound('cash'); writeSave(state);
+}
+export function updateWorld(state, input, aim, dt) {
+  if (state.screen !== 'play') return;
+  state.elapsed += dt; state.time = (state.time + dt / 100) % 24;
+  state.saved = Math.max(0, state.saved - dt); state.shake *= Math.exp(-dt * 12); state.toast.time = Math.max(0, state.toast.time - dt);
+  state.effects.update(dt);
+  if (state.mapOpen || state.shopOpen || state.mission.briefing) return;
+  const p = state.player, oldX = p.x, oldY = p.y;
+  if (p.car) {
+    const throttle = (input.key('KeyW') || input.key('ArrowUp') ? 1 : 0) - (input.key('KeyS') || input.key('ArrowDown') ? 1 : 0);
+    const turn = (input.key('KeyD') || input.key('ArrowRight') ? 1 : 0) - (input.key('KeyA') || input.key('ArrowLeft') ? 1 : 0);
+    moveCar(state, p.car, throttle, turn, input.key('Space'), dt);
+    p.x = p.car.x; p.y = p.car.y; p.angle = p.car.angle;
+  } else {
+    // Screen-relative movement is converted back through the oblique projection.
+    let sx = (input.key('KeyD') || input.key('ArrowRight') ? 1 : 0) - (input.key('KeyA') || input.key('ArrowLeft') ? 1 : 0);
+    let sy = (input.key('KeyS') || input.key('ArrowDown') ? 1 : 0) - (input.key('KeyW') || input.key('ArrowUp') ? 1 : 0);
+    let dx = sx / .86 + sy / .48, dy = sy / .48 - sx / .86;
+    const len = Math.hypot(dx, dy); if (len > 0) { dx /= len; dy /= len; }
+    const speed = input.key('ShiftLeft') || input.key('ShiftRight') ? 195 : 115;
+    const nx = p.x + dx * speed * dt, ny = p.y + dy * speed * dt;
+    if (!state.city.blocked(nx, p.y, 10)) p.x = nx;
+    if (!state.city.blocked(p.x, ny, 10)) p.y = ny;
+    if (aim) p.angle = Math.atan2(aim.y - p.y, aim.x - p.x);
+    if (input.pointer.down && p.weapon !== 'FISTS') fireWeapon(state, p.x, p.y, p.angle);
+    if (input.pointer.down && p.weapon === 'FISTS') punch(state);
+    if (input.key('KeyF')) punch(state);
+  }
+  state.stats.distance += Math.hypot(p.x - oldX, p.y - oldY);
+  updateTraffic(state, dt); updateCarCollisions(state, dt); updatePolice(state, dt); updatePedestrians(state, dt); updateCombat(state, dt); updateMissions(state, dt);
+  state.autosave += dt;
+  if (state.autosave > 40 && state.heat === 0) { writeSave(state); state.autosave = 0; }
 }
