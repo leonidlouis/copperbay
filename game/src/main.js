@@ -1,3 +1,5 @@
+import { startRace } from './activities.js';
+import { garageService } from './garage.js';
 import { createWorld, updateWorld, interact, buyItem } from './world.js';
 import { createRenderer } from './render.js';
 import { createInput } from './input.js';
@@ -27,12 +29,14 @@ function action(id) {
   if (id === 'save' && state.heat === 0) { writeSave(state); save = readSave(); }
   if (id === 'louder' || id === 'quieter') { settings.volume = clamp(settings.volume + (id === 'louder' ? .1 : -.1), 0, 1); audio.setVolume(settings.volume); saveSettings(settings); }
   if (['ammo', 'armor', 'health', 'shotgun'].includes(id)) buyItem(state, id);
+  if (['repair', 'turbo', 'chassis'].includes(id)) garageService(state, id);
   if (id === 'closeShop') state.shopOpen = false;
 }
 function handleInput() {
   if (input.take('Escape') || input.take('KeyP')) {
     if (state.settingsOpen) state.settingsOpen = false;
     else if (state.shopOpen) state.shopOpen = false;
+    else if (state.garageOpen) state.garageOpen = false;
     else if (state.mapOpen) state.mapOpen = false;
     else if (state.screen === 'play') state.screen = 'pause';
     else if (state.screen === 'pause') state.screen = 'play';
@@ -46,6 +50,7 @@ function handleInput() {
     else if (state.mission.briefing) advanceBriefing(state);
   }
   if (state.screen === 'play') {
+    if (input.take('KeyR') && !state.mapOpen && !state.shopOpen && !state.garageOpen && !state.mission.briefing) startRace(state);
     if (input.take('KeyE')) interact(state);
     if (input.take('Tab') && state.mission.active) { state.mission.briefing = true; state.mission.radio = true; state.mission.dialogue = 0; }
     if (input.take('KeyM')) state.mapOpen = !state.mapOpen;

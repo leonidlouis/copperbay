@@ -32,9 +32,10 @@ export function spawnTraffic() {
 export function moveCar(state, car, throttle, steering, brake, dt) {
   if (car.wreck) return;
   const spec = VEHICLE_TYPES[car.type];
-  car.speed += throttle * spec.accel * dt;
+  const tuned = car === state.player.car && state.progression.turbo ? 1.2 : 1;
+  car.speed += throttle * spec.accel * tuned * dt;
   car.speed *= Math.exp(-(brake ? 3.2 : throttle ? .12 : .85) * dt);
-  car.speed = clamp(car.speed, -spec.max * .35, spec.max);
+  car.speed = clamp(car.speed, -spec.max * .35, spec.max * tuned);
   const steerPower = Math.min(1, Math.abs(car.speed) / 70);
   car.angle += steering * spec.turn * steerPower * dt * (car.speed < 0 ? -1 : 1) * (brake ? 1.55 : 1);
   const grip = brake ? 1.8 : spec.grip;
@@ -58,7 +59,7 @@ export function updateTraffic(state, dt) {
   const playerCar = state.player.car;
   for (const car of state.cars) {
     car.cooldown = Math.max(0, car.cooldown - dt); car.flash = Math.max(0, car.flash - dt);
-    if (car === playerCar || car.police || car.wreck || !car.driver || car.parked) continue;
+    if (car === playerCar || car.rival || car.police || car.wreck || !car.driver || car.parked) continue;
     let targetSpeed = car.cruise;
     // Brake for cars ahead in the same lane, and for pedestrians crossing close by.
     const forwardX = Math.cos(car.angle), forwardY = Math.sin(car.angle);
@@ -104,6 +105,7 @@ export function interactWithCar(state) {
     state.crime(car.police ? 1.5 : .8);
     state.peds.push({ x: car.x + 40, y: car.y, angle: 0, hp: 60, flee: 10, color: '#db9d75', police: false, seed: 99 });
   }
+  if (state.progression.chassis && !car.reinforced) { car.hp += 80; car.reinforced = true; }
   p.car = car; car.driver = false; car.parked = false; if (!car.stolen) { state.stats.carsStolen++; car.stolen = true; }
   p.x = car.x; p.y = car.y; state.audio.sound('click');
   state.toast = { text: VEHICLE_TYPES[car.type].name + ' · WASD drive · SPACE handbrake · E exit', time: 4 };

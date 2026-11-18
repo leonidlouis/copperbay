@@ -1,3 +1,6 @@
+import { drawRaceGate } from './activities.js';
+import { drawCoastObject } from './seaside.js';
+import { drawHelicopter } from './helicopter.js';
 import { createPainter } from './painter.js';
 import { drawCityGround, drawBuilding, drawPalm, drawLamp, drawStreetProp } from './city-art.js';
 import { drawVehicle, drawPerson, drawMissionMarker } from './actors-art.js';
@@ -17,8 +20,8 @@ export function createRenderer(canvas) {
     const key = kind + ':' + object.x + ':' + object.y;
     let sprite = sprites.get(key);
     if (!sprite) {
-      const w = kind === 'building' ? 640 : 160, h = kind === 'building' ? 500 : 180;
-      const anchor = kind === 'building' ? 300 : 130;
+      const w = kind === 'building' ? 640 : 160, h = kind === 'building' ? 500 : 260;
+      const anchor = kind === 'building' ? 300 : 170;
       const image = document.createElement('canvas'); image.width = w; image.height = h;
       const brush = createPainter(image, true); brush.view.x = center.x; brush.view.y = center.y;
       brush.view.shakeX = w / 2 - 640; brush.view.shakeY = anchor - 415;
@@ -35,13 +38,13 @@ export function createRenderer(canvas) {
       const image = document.createElement('canvas'); image.width = 7168; image.height = 4096;
       const brush = createPainter(image); brush.view.x = 2000; brush.view.y = 2000;
       brush.view.shakeX = 3584 - 640; brush.view.shakeY = 2048 - 415; brush.visible = () => true;
-      brush.ctx.fillStyle = state.night > .5 ? '#173645' : '#39727a'; brush.ctx.fillRect(0, 0, 7168, 4096);
+      brush.ctx.fillStyle = state.night > .5 ? '#173645' : '#45b9b5'; brush.ctx.fillRect(0, 0, 7168, 4096);
       drawCityGround(brush, state); groundCache = image;
     }
     const z = p.view.zoom;
     const sx = 3584 + (p.view.x - p.view.y) * .86 - (640 + p.view.shakeX) / z;
     const sy = 2048 + (p.view.x + p.view.y - 4000) * .48 - (415 + p.view.shakeY) / z;
-    ctx.fillStyle = state.night > .5 ? '#173645' : '#39727a'; ctx.fillRect(0, 0, 1280, 800);
+    ctx.fillStyle = state.night > .5 ? '#173645' : '#45b9b5'; ctx.fillRect(0, 0, 1280, 800);
     ctx.drawImage(groundCache, sx, sy, 1280 / z, 800 / z, 0, 0, 1280, 800);
     for (const s of state.effects.skids) {
       if (!p.visible(s.x, s.y, 20)) continue;
@@ -62,6 +65,7 @@ export function createRenderer(canvas) {
       const q = p.project(x, y, 1); ctx.save(); ctx.translate(q.x, q.y); ctx.transform(.86 * p.view.zoom, .48 * p.view.zoom, -.43 * p.view.zoom, .24 * p.view.zoom, 0, 0); p.text(name, 0, 0, 20, '#bacab25c', '900', 'center'); ctx.restore();
     }
     const items = [];
+    for (const o of state.city.seaside) if (p.visible(o.x, o.y, 180)) items.push({ depth: o.x + o.y, draw: () => drawCoastObject(p, o) });
     for (const object of state.city.landmarks) if (p.visible(object.x, object.y, 300)) items.push({ depth: object.x + object.y, draw: () => object.type === 'crane' ? drawHarborCrane(p, object) : object.type === 'radio' ? drawRadioMast(p, object, state) : drawShippingContainer(p, object) });
     for (const b of state.city.buildings) if (p.visible(b.x + b.w / 2, b.y + b.d / 2, 350)) items.push({ depth: b.x + b.y + (b.w + b.d) / 2, draw: () => scenery(drawBuilding, b, state, 'building') });
     for (const t of state.city.palms) if (p.visible(t.x, t.y, 100)) items.push({ depth: t.x + t.y, draw: () => scenery(drawPalm, t, state, 'palm') });
@@ -91,8 +95,13 @@ export function createRenderer(canvas) {
     for (const particle of state.effects.particles) {
       const q = p.project(particle.x, particle.y, particle.z); ctx.globalAlpha = Math.min(1, particle.life * 2); p.circle(q.x, q.y, particle.size * p.view.zoom, particle.color); ctx.globalAlpha = 1;
     }
+    if (state.night > 0) { ctx.fillStyle = `rgba(13,29,60,${state.night * .3})`; ctx.fillRect(0, 0, 1280, 800); }
+    drawRaceGate(p, state);
+    drawHelicopter(p, state);
+    // Golden sunlight warms the ordinary day cycle, without obscuring the scene.
+    if (state.night < .5) { ctx.fillStyle = '#ffc4780b'; ctx.fillRect(0, 0, 1280, 800); }
     // Restrained camera vignetting preserves the bright pastel city and luminous streets.
-    const vignette = ctx.createRadialGradient(640, 380, 270, 640, 380, 830); vignette.addColorStop(0, '#102e3c00'); vignette.addColorStop(1, '#0d233962'); ctx.fillStyle = vignette; ctx.fillRect(0, 0, 1280, 800);
+    const vignette = ctx.createRadialGradient(640, 380, 270, 640, 380, 830); vignette.addColorStop(0, '#102e3c00'); vignette.addColorStop(1, '#674b320b'); ctx.fillStyle = vignette; ctx.fillRect(0, 0, 1280, 800);
     if (!state.player.car && state.screen === 'play' && !state.mission.briefing) {
       const aim = state.pointer || { x: 700, y: 400 }; ctx.strokeStyle = '#fff4d8b0'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(aim.x, aim.y, 6, 0, Math.PI * 2); ctx.moveTo(aim.x - 10, aim.y); ctx.lineTo(aim.x - 4, aim.y); ctx.moveTo(aim.x + 4, aim.y); ctx.lineTo(aim.x + 10, aim.y); ctx.stroke();
     }

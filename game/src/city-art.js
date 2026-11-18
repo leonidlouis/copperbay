@@ -1,15 +1,17 @@
+import { drawCoast } from './seaside.js';
 import { ROAD_CENTERS, CITY_SIZE } from './city.js';
 import { hash, TAU } from './math.js';
 import { tint } from './painter.js';
 export function drawCityGround(p, state) {
   const { ctx, project, poly, ground, line, visible } = p;
-  ctx.fillStyle = state.night > .5 ? '#173645' : '#39727a'; ctx.fillRect(0, 0, 1280, 800);
+  ctx.fillStyle = state.night > .5 ? '#173645' : '#45b9b5'; ctx.fillRect(0, 0, 1280, 800);
   // Sea and little gold reflections extend beyond the explorable coastline.
   for (let i = 0; i < 90; i++) {
     const x = -500 + hash(i, 6) * 900, y = hash(i, 3) * 4900;
     line(x, y, x + 30 + hash(i, 5) * 70, y, '#629e9d66', 1);
   }
-  ground(190, 190, 3790, 3790, state.night > .5 ? '#627c7c' : '#b5b09a');
+  ground(190, 190, 3790, 3790, state.night > .5 ? '#627c7c' : '#e5c9a0');
+  drawCoast(p, state);
   // Seawall and boardwalk.
   ground(163, 170, 27, 3800, '#b5b59d', 5); ground(190, 3945, 3780, 27, '#c0b397', 5);
   for (let y = 200; y < 3900; y += 25) line(165, y, 191, y, '#7d8a83', 1, 6);
@@ -20,7 +22,7 @@ export function drawCityGround(p, state) {
     ground(-85, y + 105, 115, 43, '#eef2dc', 5); ground(-65, y + 115, 70, 23, '#3d6877', 11);
   }
   for (const c of ROAD_CENTERS) {
-    ground(c - 75, 190, 150, 3790, '#273f4d'); ground(190, c - 75, 3790, 150, '#273f4d');
+    ground(c - 75, 190, 150, 3790, '#687c79'); ground(190, c - 75, 3790, 150, '#687c79');
     line(c - 76, 200, c - 76, 3940, '#cbd2b2', 2); line(c + 76, 200, c + 76, 3940, '#cbd2b2', 2);
     line(200, c - 76, 3940, c - 76, '#cbd2b2', 2); line(200, c + 76, 3940, c + 76, '#cbd2b2', 2);
     for (let v = 200; v < 3940; v += 52) {
@@ -33,7 +35,7 @@ export function drawCityGround(p, state) {
   }
   for (const x of ROAD_CENTERS) for (const y of ROAD_CENTERS) {
     if (!visible(x, y, 180)) continue;
-    ground(x - 72, y - 72, 144, 144, '#2b4351');
+    ground(x - 72, y - 72, 144, 144, '#6c807c');
     for (let k = -56; k <= 56; k += 16) {
       ground(x + k, y - 104, 9, 27, '#d7d6bf'); ground(x + k, y + 77, 9, 27, '#d7d6bf');
       ground(x - 104, y + k, 27, 9, '#d7d6bf'); ground(x + 77, y + k, 27, 9, '#d7d6bf');
@@ -62,24 +64,25 @@ export function drawCityGround(p, state) {
 export function drawBuilding(p, b, state) {
   const { ctx, project, poly, ground, line, prism } = p;
   const light = 1 - state.night * .23;
-  ground(b.x + 28, b.y + 34, b.w, b.d, '#122b3c55');
-  prism(b.x, b.y, b.w, b.d, b.h, tint(b.roof, light), tint(b.color, light * .88), tint(b.color, light * .66));
+  const shadow = b.h * .78;
+  poly([project(b.x, b.y + b.d), project(b.x + b.w, b.y), project(b.x + b.w + shadow, b.y + shadow), project(b.x + b.w + shadow, b.y + b.d + shadow), project(b.x + shadow, b.y + b.d + shadow)], '#736b7c32');
+  prism(b.x, b.y, b.w, b.d, b.h, tint(b.roof, light), tint(b.color, light * 1.02), tint(b.color, light * .84));
   // Colored shop-front panels, lit windows, and repeated floors on both visible walls.
   for (let f = 0; f < b.floors; f++) {
     const z = 12 + f * 23;
     for (let k = 15; k < b.w - 12; k += 24) {
-      const color = hash(b.id * 3 + k, f) > .35 ? (f === 0 ? b.neon : '#ffdc9b') : '#315465';
+      const color = hash(b.id * 3 + k, f) > .35 ? (f === 0 ? b.neon : '#ffdc9b') : '#63999d';
       poly([project(b.x + k, b.y + b.d + .4, z), project(b.x + k + 13, b.y + b.d + .4, z), project(b.x + k + 13, b.y + b.d + .4, z + 11), project(b.x + k, b.y + b.d + .4, z + 11)], color);
     }
     for (let k = 17; k < b.d - 10; k += 30) {
-      const color = hash(b.id + k, f * 7) > .5 ? '#eacfa0' : '#284c5d';
+      const color = hash(b.id + k, f * 7) > .5 ? '#eacfa0' : '#4f858b';
       poly([project(b.x + b.w + .4, b.y + k, z), project(b.x + b.w + .4, b.y + k + 14, z), project(b.x + b.w + .4, b.y + k + 14, z + 11), project(b.x + b.w + .4, b.y + k, z + 11)], color);
     }
   }
   line(b.x, b.y + b.d, b.x + b.w, b.y + b.d, '#f8d0a2', 2, b.h + 1);
   line(b.x + b.w, b.y, b.x + b.w, b.y + b.d, '#e5b795', 2, b.h + 1);
   // Parapets, rooftop utility rooms, fans and ducting.
-  ground(b.x + 7, b.y + 7, b.w - 14, b.d - 14, tint(b.roof, light * .88), b.h + 1, '#d6bca177');
+  ground(b.x + 7, b.y + 7, b.w - 14, b.d - 14, tint(b.roof, light * 1.02), b.h + 1, '#d6bca177');
   prism(b.x + 16, b.y + 18, Math.min(53, b.w - 30), 42, 10, '#8ca3a1', '#657e83', '#4c6775', b.h + 2);
   for (let k = 0; k < 2; k++) {
     const q = project(b.x + 28 + k * 22, b.y + 36, b.h + 14); p.circle(q.x, q.y, 6 * p.view.zoom, '#435e69');
@@ -147,7 +150,7 @@ export function drawBuilding(p, b, state) {
 export function drawPalm(p, t) {
   const { ctx, project, line, poly } = p;
   const h = t.park ? 37 : 56, q = project(t.x, t.y, h), base = project(t.x, t.y);
-  poly([project(t.x, t.y), project(t.x + 40, t.y + 26), project(t.x + 48, t.y + 20)], '#153a3f33');
+  poly([project(t.x, t.y), project(t.x + 82, t.y + 63), project(t.x + 104, t.y + 48)], '#153a3f33');
   ctx.strokeStyle = '#8a8b67'; ctx.lineWidth = 5 * p.view.zoom; ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.quadraticCurveTo(base.x - 5, base.y - h * .5 * p.view.zoom, q.x + 3, q.y); ctx.stroke();
   p.circle(q.x, q.y, 7 * p.view.zoom, '#376e63');
   for (let k = 0; k < 7; k++) {

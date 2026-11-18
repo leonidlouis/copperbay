@@ -1,3 +1,4 @@
+import { awardReputation } from './progression.js';
 import { distance } from './math.js';
 import { writeSave } from './save.js';
 export const STORY = [
@@ -5,12 +6,12 @@ export const STORY = [
     { type: 'steal', text: 'Get in the coral Cavell outside the garage.', target: { x: 825, y: 825 } },
     { type: 'drive', text: 'Drive the Cavell to Inez at Pier 09.', target: { x: 825, y: 3200 } },
   ] },
-  { name: 'PAPER TRAIL', contact: 'INEZ ROOK', role: 'A ledger, a debt, a way out', payout: 1200, start: { x: 825, y: 3200 }, dialogue: ['This ledger lists every bribe the port ever paid.', 'The missing pages are in Crown Quarter.', 'Voss has guards there. Bring the pages back alive.'], steps: [
-    { type: 'reach', text: 'Find Voss’s couriers in Crown Quarter.', target: { x: 2240, y: 1855 }, spawn: true },
-    { type: 'defeat', text: 'Take down the three couriers. Recover the pages.', target: { x: 2240, y: 1855 }, enemies: 3 },
-    { type: 'reach', text: 'Collect the missing pages.', target: { x: 2240, y: 1855 } },
+  { name: 'PAPER TRAIL', contact: 'INEZ ROOK', role: 'A ledger, a debt, a way out', payout: 1200, start: { x: 825, y: 3200 }, dialogue: ['This ledger lists every bribe the port ever paid.', 'The missing pages are on Solaris boardwalk.', 'Voss has guards there. Bring the pages back alive.'], steps: [
+    { type: 'reach', text: 'Find Voss’s couriers on Solaris boardwalk.', target: { x: 320, y: 1760 }, spawn: true },
+    { type: 'defeat', text: 'Take down the three couriers. Recover the pages.', target: { x: 320, y: 1760 }, enemies: 3 },
+    { type: 'reach', text: 'Collect the missing pages.', target: { x: 320, y: 1760 } },
   ] },
-  { name: 'GOLDEN HOUR', contact: 'SOL NAVARRO', role: 'Driver / professional optimist', payout: 1800, start: { x: 2240, y: 1855 }, dialogue: ['Port security are jamming our radio link.', 'I’ve got a van full of transmitters. They’re fragile.', 'Get it to the hills in under two minutes. No fireworks.'], steps: [
+  { name: 'GOLDEN HOUR', contact: 'SOL NAVARRO', role: 'Driver / professional optimist', payout: 1800, start: { x: 320, y: 1760 }, dialogue: ['Port security are jamming our radio link.', 'I’ve got a van full of transmitters. They’re fragile.', 'Get it to the hills in under two minutes. No fireworks.'], steps: [
     { type: 'steal', text: 'Find a vehicle. The hills are a long walk.', target: { x: 2240, y: 1760 } },
     { type: 'drive', text: 'Deliver the transmitters to Verdigris Hills.', target: { x: 3200, y: 800 }, limit: 120 },
   ] },
@@ -73,8 +74,8 @@ function enterStep(state) {
 export function completeMission(state) {
   const m = state.mission, story = currentMission(state);
   state.player.money += story.payout; state.player.health = Math.min(100, state.player.health + 25); state.player.ammo += 24;
-  m.lastName = story.name; m.lastPayout = story.payout; m.banner = 0; state.screen = 'complete'; m.index++; m.active = false; m.step = 0; m.spawned = false;
-  state.stats.missions++; state.audio.sound('cash');
+  m.lastName = story.name; m.lastPayout = story.payout; m.banner = 8; state.screen = 'play'; m.index++; m.active = false; m.step = 0; m.spawned = false;
+  state.stats.missions++; awardReputation(state, 320); state.audio.sound('cash');
   if (m.index >= STORY.length) { m.complete = true; state.screen = 'ending'; }
   writeSave(state);
 }

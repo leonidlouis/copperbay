@@ -78,7 +78,7 @@ export function drawPerson(p, actor, state, player = false) {
   }
   if (player && actor.invincible > 0 && Math.floor(state.elapsed * 18) % 2 === 0) return;
   const moving = player ? state.walking : true;
-  const stride = moving ? Math.sin(state.elapsed * (actor.flee ? 14 : 9) + (actor.seed || 0)) * 4 : 0;
+  const stride = moving ? Math.sin(state.elapsed * (actor.flee ? 14 : 9) + (actor.seed || 0)) * (actor.flee ? 8 : 4) : 0;
   ctx.strokeStyle = player ? '#203c52' : '#2e4757'; ctx.lineWidth = 4.5 * zoom; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(base.x - 3 * zoom, base.y - 10 * zoom); ctx.lineTo(base.x - 4 * zoom + stride, base.y); ctx.moveTo(base.x + 3 * zoom, base.y - 10 * zoom); ctx.lineTo(base.x + 4 * zoom - stride, base.y); ctx.stroke();
   ctx.strokeStyle = player ? '#f09677' : actor.police ? '#547e98' : actor.enemy ? '#ae5966' : actor.color; ctx.lineWidth = 10 * zoom;
@@ -87,6 +87,11 @@ export function drawPerson(p, actor, state, player = false) {
   p.circle(head.x - 1.5 * zoom, head.y - 3 * zoom, 4.6 * zoom, player ? '#453d42' : actor.police ? '#24435c' : '#56504b');
   if (player) { p.circle(head.x - 5 * zoom, head.y + 1 * zoom, 3 * zoom, '#453d42'); ctx.fillStyle = '#f4d9af'; ctx.fillRect(base.x - 4 * zoom, base.y - 19 * zoom, 8 * zoom, 2 * zoom); }
   const armed = player ? actor.weapon !== 'FISTS' : actor.police || actor.enemy;
+  if (!armed) {
+    ctx.strokeStyle = '#e4b493'; ctx.lineWidth = 3.3 * zoom;
+    ctx.beginPath(); ctx.moveTo(base.x - 5 * zoom, base.y - 19 * zoom); ctx.lineTo(base.x - (9 + stride * .5) * zoom, base.y - 9 * zoom);
+    ctx.moveTo(base.x + 5 * zoom, base.y - 19 * zoom); ctx.lineTo(base.x + (9 - stride * .5) * zoom, base.y - 10 * zoom); ctx.stroke();
+  }
   if (armed || (player && actor.punch > 0)) {
     const reach = actor.punch > 0 ? 28 : 19;
     const hand = p.project(actor.x + Math.cos(actor.angle) * reach, actor.y + Math.sin(actor.angle) * reach, 17);
@@ -94,7 +99,11 @@ export function drawPerson(p, actor, state, player = false) {
     if (armed) {
       const end = p.project(actor.x + Math.cos(actor.angle) * (reach + 10), actor.y + Math.sin(actor.angle) * (reach + 10), 17);
       ctx.strokeStyle = '#183241'; ctx.lineWidth = 4 * zoom; ctx.beginPath(); ctx.moveTo(hand.x, hand.y); ctx.lineTo(end.x, end.y); ctx.stroke();
-      if (player && actor.muzzle > 0) { p.glow(end.x, end.y, 36, '#ffd585', .85); p.poly([{ x: end.x - 7, y: end.y }, { x: end.x + 10, y: end.y - 6 }, { x: end.x + 2, y: end.y + 9 }], '#fff0b3'); }
+      if (player && actor.muzzle > 0) {
+        p.glow(end.x, end.y, 42, '#ffd585', .85);
+        const points = Array.from({ length: 12 }, (_, i) => { const a = i * TAU / 12, r = (i % 2 ? 4 : 14) * zoom; return { x: end.x + Math.cos(a) * r, y: end.y + Math.sin(a) * r }; });
+        p.poly(points, '#fff1b1'); p.circle(end.x, end.y, 4 * zoom, '#ffffff');
+      }
     }
   }
   if (player) {

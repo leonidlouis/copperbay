@@ -1,3 +1,7 @@
+import { drawMapScreen } from './map-screen.js';
+import { drawGarage } from './garage.js';
+import { reputation } from './progression.js';
+import { activityTarget } from './activities.js';
 import { ROAD_CENTERS, PLACES, DISTRICTS, districtAt } from './city.js';
 import { currentMission, missionTarget, missionObjective, STORY } from './missions.js';
 import { VEHICLE_TYPES } from './vehicles.js';
@@ -17,19 +21,21 @@ export function createHUD(p) {
   function button(id, title, sub, x, y, w = 330, accent = false, disabled = false) {
     ctx.fillStyle = accent ? GOLD : '#203d4b'; ctx.beginPath(); ctx.roundRect(x, y, w, 58, 5); ctx.fill();
     ctx.strokeStyle = accent ? '#ffe4ac' : '#91b6b54a'; ctx.lineWidth = 1; ctx.stroke();
-    text(title, x + 20, y + 36, 22, accent ? '#173747' : disabled ? '#6e8c94' : CREAM, '900');
+    text(title, x + 20, y + 36, w < 320 ? 16 : 22, accent ? '#173747' : disabled ? '#6e8c94' : CREAM, '900');
     text(sub, x + w - 18, y + 35, 13, accent ? '#345361' : MUTED, '700', 'right');
     if (!disabled) buttons.push({ id, x, y, w, h: 58 });
   }
   function minimap(state, cx = 133, cy = 635, radius = 93, full = false) {
-    const player = state.player, target = missionTarget(state);
+    const player = state.player, target = activityTarget(state) || missionTarget(state);
     const mapScale = full ? radius * 2 / 4300 : .13;
     const centerX = full ? 2050 : player.x, centerY = full ? 2050 : player.y;
     const map = (x, y) => ({ x: cx + (x - centerX) * mapScale, y: cy + (y - centerY) * mapScale });
     ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, radius, 0, TAU); ctx.clip();
-    ctx.fillStyle = '#174b59'; ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-    const land = map(190, 190); ctx.fillStyle = '#284d52'; ctx.fillRect(land.x, land.y, 3790 * mapScale, 3790 * mapScale);
-    ctx.strokeStyle = '#738d89'; ctx.lineWidth = Math.max(4, 146 * mapScale); ctx.beginPath();
+    ctx.fillStyle = '#368e94'; ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+    const land = map(190, 190); ctx.fillStyle = '#76958b'; ctx.fillRect(land.x, land.y, 3790 * mapScale, 3790 * mapScale);
+    const beach = map(-165, 690); ctx.fillStyle = '#e8c68f'; ctx.fillRect(beach.x, beach.y, 340 * mapScale, 1850 * mapScale);
+    const apron = map(-130, 2750); ctx.fillStyle = '#b9ac91'; ctx.fillRect(apron.x, apron.y, 320 * mapScale, 740 * mapScale);
+    ctx.strokeStyle = '#c4baa1'; ctx.lineWidth = Math.max(4, 146 * mapScale); ctx.beginPath();
     for (const v of ROAD_CENTERS) { let a = map(v, 190), b = map(v, 3970); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); a = map(190, v); b = map(3970, v); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); } ctx.stroke();
     ctx.strokeStyle = '#243d49'; ctx.lineWidth = Math.max(2, 100 * mapScale); ctx.stroke();
     if (target) {
@@ -48,35 +54,41 @@ export function createHUD(p) {
     text('N', cx, cy - radius + 15, 11, CREAM, '900', 'center');
   }
   function drawHud(state) {
-    const pl = state.player, m = state.mission, story = currentMission(state), target = missionTarget(state);
-    const gradient = ctx.createLinearGradient(0, 0, 0, 180); gradient.addColorStop(0, '#0d2639c9'); gradient.addColorStop(1, '#0d263900'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1280, 180);
+    const pl = state.player, m = state.mission, story = currentMission(state), target = activityTarget(state) || missionTarget(state);
+    const gradient = ctx.createLinearGradient(0, 0, 0, 180); gradient.addColorStop(0, '#173b477c'); gradient.addColorStop(1, '#0d263900'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1280, 180);
+    panel(20, 20, 301, 103, .84);
     text('COPPER BAY', 30, 66, 43, CREAM, '900', 'left', 'Arial Black, Arial');
     ctx.fillStyle = GOLD; ctx.fillRect(31, 80, 40, 3); label('THE MERIDIAN FILES', 82, 85, GOLD);
     const hour = Math.floor(state.time), minute = Math.floor((state.time % 1) * 60);
     label(`${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}  /  ${districtAt(pl.x, pl.y).tag}`, 31, 110);
-    if (!pl.car) { text('ON FOOT', 31, 156, 29, GOLD, '900'); label('MARA VALE', 32, 177, CREAM); }
+    if (!pl.car) { panel(20, 128, 180, 62, .84); text('ON FOOT', 31, 156, 29, GOLD, '900'); label('MARA VALE', 32, 177, CREAM); }
     text('$' + Math.floor(pl.money).toLocaleString('en-US'), 1246, 57, 32, MINT, '900', 'right');
     for (let i = 0; i < 5; i++) text('★', 1102 + i * 31, 98, 28, i < Math.ceil(state.heat) ? GOLD : '#54717b', '900', 'center');
     if (state.heat > 0) {
       text(state.unseen > 3 ? 'SEARCHING · STAY OUT OF SIGHT' : 'PURSUIT ACTIVE', 1245, 120, 11, state.unseen > 3 ? MINT : '#ff9b93', '800', 'right');
       ctx.fillStyle = '#244654'; ctx.fillRect(1090, 128, 155, 3); ctx.fillStyle = GOLD; ctx.fillRect(1090, 128, 155 * (1 - Math.min(1, state.unseen / (8 + Math.ceil(state.heat) * 2))), 3);
     }
-    panel(1003, 147, 246, 66, .84);
-    label(pl.car ? VEHICLE_TYPES[pl.car.type].name : `MARA VALE  /  ${pl.weapon}`, 1016, 167, CREAM);
-    const health = pl.car ? clamp(pl.car.hp / VEHICLE_TYPES[pl.car.type].hp, 0, 1) : pl.health / 100;
+    panel(1003, 147, 246, 88, .9);
+    label(pl.car ? (pl.car.stolen ? 'STOLEN  /  ' : '') + VEHICLE_TYPES[pl.car.type].name : `MARA VALE  /  ${pl.weapon}`, 1016, 167, CREAM);
+    const health = pl.car ? clamp(pl.car.hp / (VEHICLE_TYPES[pl.car.type].hp + (pl.car.reinforced ? 80 : 0)), 0, 1) : pl.health / 100;
     ctx.fillStyle = '#48616c'; ctx.fillRect(1017, 178, 168, 6); ctx.fillStyle = MINT; ctx.fillRect(1017, 178, 168 * health, 6);
     ctx.fillStyle = '#48616c'; ctx.fillRect(1017, 189, 168, 4); ctx.fillStyle = '#8abdea'; ctx.fillRect(1017, 189, 168 * pl.armor / 100, 4);
     text(pl.car ? 'HP' : String(pl.ammo), 1233, 190, 19, CREAM, '900', 'right');
+    label(pl.car ? `PISTOL  /  ${pl.ammo} ROUNDS` : 'HEALTH        ARMOR       AMMO', 1017, 220, MUTED);
+    const rep = reputation(state);
+    text(`${rep.name}  ·  ${rep.total} REP`, 1245, 256, 12, GOLD, '900', 'right');
+    if (state.helicopter) text('AIR ONE  /  HELICOPTER TRACKING', 1245, 277, 11, '#ffba8f', '900', 'right');
     minimap(state);
     const district = districtAt(pl.x, pl.y);
     text(district.tag, 133, 753, 16, CREAM, '900', 'center'); label(district.name, 133 - district.name.length * 3.1, 771, MUTED);
     panel(260, 650, 760, 91, .94);
     ctx.fillStyle = GOLD; ctx.fillRect(260, 660, 4, 71);
     label(m.complete ? 'THE MERIDIAN FILES · COMPLETE' : `${String(Math.min(m.index + 1, 6)).padStart(2, '0')} / ${story.name}`, 280, 674, GOLD);
-    const objective = missionObjective(state); text(objective, 280, 708, objective.length > 58 ? 21 : 24, CREAM, '800');
+    const objective = state.activity ? `SOLARIS SPRINT · Gate ${state.activity.checkpoint + 1}/5 · Beat the rival` : missionObjective(state); text(objective, 280, 708, objective.length > 58 ? 21 : 24, CREAM, '800');
     if (target) text(Math.round(distance(pl, target)) + ' m', 1001, 674, 13, MUTED, '700', 'right');
+    if (state.activity) text(Math.ceil(state.activity.remaining) + 's', 1000, 707, 22, GOLD, '900', 'right');
     if (m.timer > 0) text(`${Math.ceil(m.timer)}s`, 1000, 707, 22, '#ff9d86', '900', 'right');
-    const keys = pl.car ? [['WASD', 'drive', 47], ['SPACE', 'handbrake', 55], ['E', 'exit', 25], ['M', 'map', 25], ['ESC', 'pause', 39]] : [['WASD', 'move', 47], ['SHIFT', 'sprint', 47], ['E', 'steal / talk', 25], ['LMB', 'fire', 39], ['F', 'punch', 25], ['M', 'map', 25]];
+    const keys = pl.car ? [['WASD', 'drive', 47], ['SPACE', 'handbrake', 55], ['E', 'exit / service', 25], ['M', 'map', 25], ['R', 'race', 25]] : [['WASD', 'move', 47], ['SHIFT', 'sprint', 47], ['E', 'steal / talk', 25], ['LMB', 'fire', 39], ['F', 'punch', 25], ['M', 'map', 25]];
     let x = 274;
     for (const [key, name, w] of keys) { keycap(key, x, 773, w); text(name, x + w + 7, 773, 12, CREAM, '700'); x += w + name.length * 6 + 27; }
     if (pl.car) {
@@ -85,7 +97,8 @@ export function createHUD(p) {
       const v = Math.abs(pl.car.speed) / VEHICLE_TYPES[pl.car.type].max;
       for (let i = 0; i < 14; i++) { ctx.fillStyle = i / 14 < v ? i > 10 ? '#ff967a' : MINT : '#2b4b58'; ctx.fillRect(1071 + i * 11, 737 - i * .5, 7, 15 + i * .5); }
     }
-    if (state.saved > 0) label('✓ LOCAL SAVE', 1146, 236, MINT);
+    if (state.saved > 0) label('✓ LOCAL SAVE', 1100, 296, MINT);
+    if (state.progression.banner > 0 && !m.briefing) { panel(360, 185, 560, 38, .94); text(state.progression.announcement, 640, 210, 13, MINT, '900', 'center'); }
     if (state.toast.time > 0 && !m.briefing) {
       const w = Math.min(760, state.toast.text.length * 7 + 40); panel(640 - w / 2, 139, w, 38, .86); text(state.toast.text, 640, 164, 13, CREAM, '700', 'center');
     }
@@ -98,24 +111,15 @@ export function createHUD(p) {
   }
   function dialogue(state) {
     const story = currentMission(state), m = state.mission;
-    panel(34, 220, 425, 228, .96); ctx.fillStyle = GOLD; ctx.fillRect(34, 235, 4, 190);
-    label((m.radio ? 'RADIO / ' : 'INCOMING / ') + story.contact, 57, 249, GOLD);
-    text(story.name, 57, 284, story.name.length > 22 ? 22 : 27, CREAM, '900');
-    text(story.role, 57, 308, 13, MUTED, '700');
-    const words = story.dialogue[m.dialogue].split(' '); let line = '', y = 349;
-    for (const word of words) { if ((line + word).length > 34) { text(line, 57, y, 20, CREAM, '500'); line = ''; y += 27; } line += word + ' '; }
-    text(line, 57, y, 20, CREAM, '500');
+    panel(34, 238, 360, 210, .96); ctx.fillStyle = GOLD; ctx.fillRect(34, 250, 4, 180);
+    label((m.radio ? 'RADIO / ' : 'INCOMING / ') + story.contact, 57, 266, GOLD);
+    text(story.name, 57, 300, story.name.length > 22 ? 20 : 25, CREAM, '900');
+    text(story.role, 57, 324, 12, MUTED, '700');
+    const words = story.dialogue[m.dialogue].split(' '); let line = '', y = 359;
+    for (const word of words) { if ((line + word).length > 30) { text(line, 57, y, 17, CREAM, '500'); line = ''; y += 24; } line += word + ' '; }
+    text(line, 57, y, 17, CREAM, '500');
     keycap('↵', 57, 424, 27); text(m.dialogue === story.dialogue.length - 1 ? (m.radio ? 'End call' : 'Accept job') : 'Continue conversation', 96, 424, 13, GOLD);
-    text(`${m.dialogue + 1} / ${story.dialogue.length}`, 436, 424, 13, MUTED, '700', 'right');
-  }
-  function cityMap(state) {
-    ctx.fillStyle = '#0b2438c9'; ctx.fillRect(0, 0, 1280, 800); panel(98, 40, 1084, 720, .97);
-    text('THE CITY IS YOURS.', 139, 105, 38, CREAM, '900'); label('COPPER BAY / CITY MAP', 140, 132, GOLD);
-    minimap(state, 474, 432, 260, true);
-    text('FOUR DISTRICTS.', 792, 222, 24, CREAM, '900');
-    DISTRICTS.forEach((d, i) => { text(String(i + 1).padStart(2, '0'), 795, 270 + i * 59, 15, d.color, '900'); text(d.name, 829, 270 + i * 59, 17, CREAM, '900'); label(d.tag, 829, 290 + i * 59); });
-    text('◆  Active mission', 795, 551, 16, GOLD); text('●  Shop / safehouse', 795, 582, 16, MINT); text('●  Police patrol', 795, 613, 16, '#87bded');
-    text('M / ESC   BACK TO THE STREETS', 139, 727, 14, GOLD, '900');
+    text(`${m.dialogue + 1} / ${story.dialogue.length}`, 374, 424, 13, MUTED, '700', 'right');
   }
   function title(state, hasSave) {
     const g = ctx.createLinearGradient(0, 0, 1100, 0); g.addColorStop(0, '#0a2537fa'); g.addColorStop(.48, '#0b2a3eea'); g.addColorStop(1, '#122d3b00'); ctx.fillStyle = g; ctx.fillRect(0, 0, 1280, 800);
@@ -154,7 +158,7 @@ export function createHUD(p) {
       button('resume', 'CONTINUE', 'ENTER →', 337, 558, 290, true);
       button('new', 'NEW GAME', '↻', 653, 558, 290);
     } else {
-      panel(397, 226, 486, 137, .94); text('MISSION PASSED', 640, 272, 32, GOLD, '900', 'center'); text(m.lastName, 640, 304, 19, CREAM, '900', 'center'); text('+$' + m.lastPayout.toLocaleString('en-US') + '  ·  PROGRESS SAVED', 640, 338, 17, MINT, '900', 'center');
+      panel(31, 198, 422, 112, .94); text('MISSION PASSED', 52, 232, 27, GOLD, '900'); text(m.lastName, 52, 259, 16, CREAM, '900'); text('+$' + m.lastPayout.toLocaleString('en-US') + '  ·  +320 REP  ·  SAVED', 52, 289, 17, MINT, '900');
     }
   }
   function death(state) {
@@ -192,8 +196,9 @@ export function createHUD(p) {
       else {
         drawHud(state);
         if (state.mission.briefing) dialogue(state);
-        if (state.mapOpen) cityMap(state);
+        if (state.mapOpen) drawMapScreen(p, state);
         if (state.shopOpen) shop(state);
+        if (state.garageOpen) drawGarage(p, state, button, panel);
         if (state.mission.banner > 0 && state.screen === 'play' && !state.mission.briefing) completion(state);
         if (state.screen === 'complete') completion(state, true);
         if (state.screen === 'wasted' || state.screen === 'busted') death(state);
