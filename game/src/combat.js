@@ -16,10 +16,11 @@ export function fireWeapon(state, x, y, angle, owner = 'player') {
     p.ammo--; p.cooldown = p.weapon === 'SCATTERGUN' ? .7 : .19; p.muzzle = .10; state.shake = 2.7; state.crime(.11); state.audio.sound('gun');
   }
   const pellets = owner === 'player' && p.weapon === 'SCATTERGUN' ? 5 : 1;
-  for (let i = 0; i < pellets; i++) { const a = angle + (i - (pellets - 1) / 2) * .065; state.bullets.push({ x: x + Math.cos(a) * 20, y: y + Math.sin(a) * 20, angle: a, life: pellets > 1 ? .4 : .8, owner, speed: 1050 }); }
+  for (let i = 0; i < pellets; i++) { const a = angle + (i - (pellets - 1) / 2) * .065; state.bullets.push({ x: x + Math.cos(a) * 6, y: y + Math.sin(a) * 6, angle: a, life: pellets > 1 ? .4 : .8, owner, speed: 1050 }); }
   state.effects.burst(x + Math.cos(angle) * 22, y + Math.sin(angle) * 22, '#ffdc8a', 5, 80, 15);
   for (const ped of state.peds) if (!ped.police && !ped.enemy && distance(ped, { x, y }) < 340) ped.flee = 7;
 }
+function awardTakedown(state){state.stats.takedowns++;state.styleScore+=250;state.stylePopup={text:'TAKEDOWN',score:250,time:2.5};}
 export function punch(state) {
   const p = state.player;
   if (p.car || p.cooldown > 0) return;
@@ -27,13 +28,13 @@ export function punch(state) {
   for (const ped of state.peds) if (ped.hp > 0 && distance(p, ped) < 62) {
     ped.hp -= 35; ped.flee = 5; ped.x += Math.cos(p.angle) * 12; ped.y += Math.sin(p.angle) * 12;
     state.crime(ped.police ? .7 : .25); state.effects.burst(ped.x, ped.y, '#ffc09b', 8, 60);
-    if (ped.hp <= 0) state.stats.takedowns++;
+    if (ped.hp <= 0) awardTakedown(state);
   }
 }
 export function damagePlayer(state, damage) {
   const p = state.player;
   if (p.invincible > 0 || state.screen !== 'play') return;
-  if (p.car) { p.car.hp -= damage * .7; return; }
+  if (p.car) { p.car.hp -= damage * .7 / (1+(p.car.armorLevel||0)*.4); return; }
   const absorbed = Math.min(p.armor, damage * .7); p.armor -= absorbed; p.health -= damage - absorbed;
   p.invincible = .25; state.shake = 5;
   if (p.health <= 0) { p.health = 0; state.screen = 'wasted'; state.audio.sound('boom'); }
@@ -49,7 +50,7 @@ export function updateCombat(state, dt) {
       for (const ped of state.peds) if (ped.hp > 0 && distance(b, ped) < 20) {
         ped.hp -= 38; ped.flee = 8; hit = true; state.effects.burst(ped.x, ped.y, '#f8b790', 8, 75);
         if (ped.police) state.crime(.6);
-        if (ped.hp <= 0) { state.stats.takedowns++; state.pickups.push({ x: ped.x, y: ped.y, kind: 'cash', value: ped.enemy ? 100 : 20 }); }
+        if (ped.hp <= 0) { awardTakedown(state); state.pickups.push({ x: ped.x, y: ped.y, kind: 'cash', value: ped.enemy ? 100 : 20 }); }
         break;
       }
       for (const car of state.cars) if (car !== p.car && !car.wreck && distance(b, car) < 29) { car.hp -= 28; car.flash = .12; hit = true; break; }

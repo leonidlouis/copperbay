@@ -1,3 +1,6 @@
+import { PLACES } from './city.js';
+import { updateChaseCamera } from './camera.js';
+import { buyUpgrade } from './garage.js';
 import { createWorld, updateWorld, interact, buyItem } from './world.js';
 import { createRenderer } from './render.js';
 import { createInput } from './input.js';
@@ -27,11 +30,14 @@ function action(id) {
   if (id === 'save' && state.heat === 0) { writeSave(state); save = readSave(); }
   if (id === 'louder' || id === 'quieter') { settings.volume = clamp(settings.volume + (id === 'louder' ? .1 : -.1), 0, 1); audio.setVolume(settings.volume); saveSettings(settings); }
   if (['ammo', 'armor', 'health', 'shotgun'].includes(id)) buyItem(state, id);
-  if (id === 'closeShop') state.shopOpen = false;
+  if (id === 'closeShop') { state.shopOpen = false; state.garageOpen = false; }
+  if (id.startsWith('upgrade:')) buyUpgrade(state, id.slice(8));
+  if (id === 'closeMap') state.mapOpen = false;
 }
 function handleInput() {
   if (input.take('Escape') || input.take('KeyP')) {
     if (state.settingsOpen) state.settingsOpen = false;
+    else if (state.garageOpen) state.garageOpen = false;
     else if (state.shopOpen) state.shopOpen = false;
     else if (state.mapOpen) state.mapOpen = false;
     else if (state.screen === 'play') state.screen = 'pause';
@@ -47,6 +53,8 @@ function handleInput() {
   }
   if (state.screen === 'play') {
     if (input.take('KeyE')) interact(state);
+    if (input.take('KeyV')) { state.viewMode = state.viewMode === '3d' ? 'iso' : '3d'; state.toast = { text: state.viewMode === '3d' ? 'CHASE CAMERA' : 'ISOMETRIC CAMERA', time: 2 }; }
+    if (input.take('KeyG') && state.player.car && Math.hypot(state.player.x - PLACES.garage.x,state.player.y - PLACES.garage.y)<200) state.garageOpen = !state.garageOpen;
     if (input.take('Tab') && state.mission.active) { state.mission.briefing = true; state.mission.radio = true; state.mission.dialogue = 0; }
     if (input.take('KeyM')) state.mapOpen = !state.mapOpen;
     if (input.take('KeyK')) {
@@ -69,7 +77,8 @@ function frame(now) {
   const dt = Math.min(.1, (now - last) / 1000); last = now;
   handleInput(); state.pointer = input.pointer;
   if (state.screen === 'title') { state.elapsed += dt; state.camera.x = 1730 + Math.sin(state.elapsed * .045) * 90; state.camera.y = 1650 + Math.cos(state.elapsed * .045) * 90; }
-  const aim = renderer.unproject(input.pointer.x, input.pointer.y + 17);
+  updateChaseCamera(state, dt);
+  const aim = renderer.unproject(input.pointer.x, input.pointer.y + (state.viewMode === '3d' ? 0 : 17));
   const old = { x: state.player.x, y: state.player.y };
   accumulator += dt;
   while (accumulator >= 1 / 60) { updateWorld(state, input, aim, 1 / 60); accumulator -= 1 / 60; }

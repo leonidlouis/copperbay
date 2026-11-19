@@ -1,3 +1,4 @@
+import { createWorld3D } from './render3d.js';
 import { createPainter } from './painter.js';
 import { drawCityGround, drawBuilding, drawPalm, drawLamp, drawStreetProp } from './city-art.js';
 import { drawVehicle, drawPerson, drawMissionMarker } from './actors-art.js';
@@ -7,9 +8,11 @@ import { missionTarget } from './missions.js';
 import { PLACES } from './city.js';
 import { clamp, hash } from './math.js';
 export function createRenderer(canvas) {
-  const p = createPainter(canvas), hud = createHUD(p), { ctx } = p;
+  const p = createPainter(canvas, true), hud = createHUD(p), { ctx } = p;
   function resize() { canvas.width = 1280; canvas.height = 800; }
   resize(); window.addEventListener('resize', resize);
+  const world3D = createWorld3D(ctx);
+  let lastState;
   let groundCache, cacheBand = -1;
   const sprites = new Map();
   function scenery(draw, object, state, kind) {
@@ -17,8 +20,8 @@ export function createRenderer(canvas) {
     const key = kind + ':' + object.x + ':' + object.y;
     let sprite = sprites.get(key);
     if (!sprite) {
-      const w = kind === 'building' ? 640 : 160, h = kind === 'building' ? 500 : 180;
-      const anchor = kind === 'building' ? 300 : 130;
+      const w = kind === 'building' ? 640 : 160, h = kind === 'building' ? 640 : 180;
+      const anchor = kind === 'building' ? 460 : 130;
       const image = document.createElement('canvas'); image.width = w; image.height = h;
       const brush = createPainter(image, true); brush.view.x = center.x; brush.view.y = center.y;
       brush.view.shakeX = w / 2 - 640; brush.view.shakeY = anchor - 415;
@@ -99,7 +102,7 @@ export function createRenderer(canvas) {
   }
   return {
     buttons: hud.buttons,
-    unproject: p.unproject,
-    draw(state, hasSave, volume) { ctx.setTransform(1, 0, 0, 1, 0, 0); world(state); hud.draw(state, hasSave, volume); },
+    unproject: (x,y) => lastState?.viewMode === '3d' ? world3D.unproject(x,y) : p.unproject(x,y),
+    draw(state, hasSave, volume) { ctx.setTransform(1, 0, 0, 1, 0, 0); lastState = state; world3D.setVisible(state.viewMode === '3d'); if (state.viewMode === '3d') { ctx.clearRect(0,0,1280,800); world3D.draw(state); } else world(state); hud.draw(state, hasSave, volume); },
   };
 }

@@ -1,6 +1,6 @@
 [
   { "name": "1-cover.jpg", "query": "?shot=1-cover", "quality": 88 },
   { "name": "2-on-foot.jpg", "query": "?shot=2", "quality": 88 },
-  { "name": "3-new-game.jpg", "query": "?shot=3", "quality": 88 },
-  { "name": "4-mission-passed.jpg", "query": "?shot=4", "quality": 88 }
+  { "name": "3-city-map.jpg", "query": "?shot=3", "quality": 88 },
+  { "name": "4-ghost-customs.jpg", "query": "?shot=4", "quality": 88 }
 ]

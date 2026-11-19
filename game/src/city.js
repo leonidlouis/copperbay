@@ -16,7 +16,7 @@ export const PLACES = {
   dock: { x: 820, y: 3225, name: 'PIER 09', icon: 'D' },
   radio: { x: 3220, y: 835, name: 'FREE BAY RADIO', icon: 'R' },
   clinic: { x: 2525, y: 2250, name: 'BAY CLINIC', icon: '+' },
-  garage: { x: 3205, y: 2715, name: 'GHOST CUSTOMS', icon: 'G' },
+  garage: { x: 3205, y: 3195, name: 'GHOST CUSTOMS', icon: 'G' },
 };
 export function districtAt(x, y) {
   if (y > 2760) return DISTRICTS[0];
@@ -47,7 +47,8 @@ export function createCity() {
       const d = 210 + rng() * 42;
       const bx = x + k * 148 + 7, by = y + 12 + rng() * 22;
       let h = 30 + rng() * 48;
-      if (i >= 3 && i <= 5 && j >= 2 && j <= 4) h += rng() * 85;
+      if (i >= 3 && i <= 5 && j >= 2 && j <= 4) h += 80 + rng() * 200;
+      if (i < 2 && j >= 2 && j <= 4) h = 140 + rng() * 165;
       if (j >= 5) h = 28 + rng() * 20;
       if (i >= 5 && j < 3) h = 25 + rng() * 20;
       buildings.push({ x: bx, y: by, w, d, h, variant: j >= 5 ? 'warehouse' : i >= 5 && j < 3 ? 'villa' : j < 2 ? 'strip' : 'urban', color: colors[Math.floor(rng() * colors.length)], roof: rng() > .45 ? '#5c777b' : '#bd9386', sign: signs[(i * 3 + j + k * 5) % signs.length], neon: ['#70efdb', '#ff8a9e', '#ffc86a'][(i + j + k) % 3], id: buildings.length, floors: Math.max(1, Math.floor(h / 23)) });
@@ -63,6 +64,8 @@ export function createCity() {
     lamps.push({ x: x - 87, y: y - 88 });
     props.push({ x: x + 91, y: y - 84, type: 'signal' });
   }
+  const workshop=buildings.find(b=>b.x>=3300&&b.y>2800&&b.y<3100);
+  if(workshop){workshop.sign='GHOST CUSTOMS';workshop.neon='#82e5be';}
   return {
     buildings, palms, lamps, props, parks, landmarks,
     blocked(x, y, radius = 8) {

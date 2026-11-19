@@ -5,13 +5,13 @@ export const STORY = [
     { type: 'steal', text: 'Get in the coral Cavell outside the garage.', target: { x: 825, y: 825 } },
     { type: 'drive', text: 'Drive the Cavell to Inez at Pier 09.', target: { x: 825, y: 3200 } },
   ] },
-  { name: 'PAPER TRAIL', contact: 'INEZ ROOK', role: 'A ledger, a debt, a way out', payout: 1200, start: { x: 825, y: 3200 }, dialogue: ['This ledger lists every bribe the port ever paid.', 'The missing pages are in Crown Quarter.', 'Voss has guards there. Bring the pages back alive.'], steps: [
-    { type: 'reach', text: 'Find Voss’s couriers in Crown Quarter.', target: { x: 2240, y: 1855 }, spawn: true },
-    { type: 'defeat', text: 'Take down the three couriers. Recover the pages.', target: { x: 2240, y: 1855 }, enemies: 3 },
-    { type: 'reach', text: 'Collect the missing pages.', target: { x: 2240, y: 1855 } },
+  { name: 'PAPER TRAIL', contact: 'INEZ ROOK', role: 'Mechanic / crew contact', payout: 1200, start: { x: 825, y: 3200 }, dialogue: ['This ledger lists every bribe the port ever paid.', 'The missing pages are in Crown Quarter.', 'Voss has guards there. Bring the pages back alive.'], steps: [
+    { type: 'reach', text: 'Find Voss’s couriers at Crown Plaza.', target: { x: 1040, y: 2480 }, spawn: true },
+    { type: 'defeat', text: 'Take down the three couriers. Recover the pages.', target: { x: 1040, y: 2480 }, enemies: 3 },
+    { type: 'reach', text: 'Collect the missing pages.', target: { x: 1040, y: 2480 } },
   ] },
-  { name: 'GOLDEN HOUR', contact: 'SOL NAVARRO', role: 'Driver / professional optimist', payout: 1800, start: { x: 2240, y: 1855 }, dialogue: ['Port security are jamming our radio link.', 'I’ve got a van full of transmitters. They’re fragile.', 'Get it to the hills in under two minutes. No fireworks.'], steps: [
-    { type: 'steal', text: 'Find a vehicle. The hills are a long walk.', target: { x: 2240, y: 1760 } },
+  { name: 'GOLDEN HOUR', contact: 'SOL NAVARRO', role: 'Driver / professional optimist', payout: 1800, start: { x: 1040, y: 2480 }, dialogue: ['Port security are jamming our radio link.', 'I’ve got a van full of transmitters. They’re fragile.', 'Get it to the hills in under two minutes. No fireworks.'], steps: [
+    { type: 'steal', text: 'Find a vehicle. The hills are a long walk.', target: { x: 1040, y: 2720 } },
     { type: 'drive', text: 'Deliver the transmitters to Verdigris Hills.', target: { x: 3200, y: 800 }, limit: 120 },
   ] },
   { name: 'CUT THE STATIC', contact: 'ADA WREN', role: 'Free Bay Radio / voice of the city', payout: 2400, start: { x: 3200, y: 800 }, dialogue: ['Voss put a jammer in a port security van.', 'It’s parked behind the Copper Club.', 'Destroy the van. Give this city its voice back.'], steps: [
@@ -20,7 +20,7 @@ export const STORY = [
     { type: 'evade', text: 'Lose the police. Stay out of sight.', target: null },
   ] },
   { name: 'DEAD AIR', contact: 'ADA WREN', role: 'The whole city is listening', payout: 3600, start: { x: 1280, y: 895 }, dialogue: ['The ledger is ready to broadcast. Voss knows.', 'Every patrol in Copper Bay is looking for you.', 'Bring it to Free Bay Radio. I’ll keep the light on.'], steps: [
-    { type: 'drive', text: 'Deliver the ledger to Free Bay Radio.', target: { x: 3200, y: 800 }, heat: 3 },
+    { type: 'drive', text: 'Deliver the ledger to Free Bay Radio.', target: { x: 3200, y: 800 }, heat: 3, limit: 180 },
     { type: 'evade', text: 'Lose your wanted level before the broadcast.', target: null },
   ] },
   { name: 'A CITY WORTH STEALING', contact: 'MARA VALE', role: 'One last delivery', payout: 6000, start: { x: 3200, y: 800 }, dialogue: ['Voss is fleeing from Pier 09 with the city’s money.', 'Inez is already there. She needs backup.', 'One last delivery. Then Copper Bay belongs to itself.'], steps: [

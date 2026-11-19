@@ -9,7 +9,7 @@ import { writeSave } from './save.js';
 export function createWorld(audio, save = null) {
   const city = createCity();
   const state = {
-    city, audio, screen: 'title', elapsed: 0, time: save?.time || 17.8, heat: 0, lastCrime: -100, unseen: 0, policeTimer: 2, bust: 0, shake: 0, saved: 0,
+    viewMode: '3d', upgrades: save?.upgrades || { engine: 0, armor: 0, nitro: 0 }, nitro: 100, styleScore: 0, stylePopup: null, garageOpen: false, city, audio, screen: 'title', elapsed: 0, time: save?.time || 17.8, heat: 0, lastCrime: -100, unseen: 0, policeTimer: 2, bust: 0, shake: 0, saved: 0,
     player: { x: save?.x || 855, y: save?.y || 790, health: 100, armor: save?.armor ?? 50, ammo: save?.ammo ?? 120, money: save?.money ?? 350, angle: -Math.PI / 2, car: null, cooldown: 0, punch: 0, muzzle: 0, invincible: 0, weapon: 'PISTOL', shotgun: save?.shotgun || false },
     cars: spawnTraffic(), peds: spawnPedestrians(), bullets: [], pickups: [
       { x: 895, y: 1280, kind: 'ammo', value: 50 }, { x: 1855, y: 2240, kind: 'health', value: 50 },
@@ -17,7 +17,7 @@ export function createWorld(audio, save = null) {
       { x: 3200, y: 1855, kind: 'cash', value: 400 }, { x: 1280, y: 2815, kind: 'cash', value: 300 },
     ], roadblocks: [], effects: createEffects(),
     mission: createMissionState(save?.mission || 0),
-    stats: save?.stats || { carsStolen: 0, takedowns: 0, wrecks: 0, missions: 0, policeSpawned: 0, distance: 0 },
+    stats: save?.stats || { carsStolen: 0, takedowns: 0, wrecks: 0, missions: 0, policeSpawned: 0, distance: 0, escapes: 0, playTime: 0 },
     toast: { text: 'Welcome home, Mara · Meet Inez at your garage', time: 6 },
     camera: { x: save?.x || 855, y: save?.y || 790, zoom: 1 }, mapOpen: false, shopOpen: false, settingsOpen: false, autosave: 0,
   };
@@ -29,6 +29,7 @@ export function createWorld(audio, save = null) {
 }
 export function interact(state) {
   if (state.mission.briefing) { advanceBriefing(state); return; }
+  if (state.garageOpen) { state.garageOpen = false; return; }
   if (state.shopOpen) { state.shopOpen = false; return; }
   const p = state.player, m = state.mission, target = missionTarget(state);
   if (!m.active && !m.complete && target && distance(p, target) < 120) { startBriefing(state); return; }
@@ -39,10 +40,7 @@ export function interact(state) {
       if (key === 'home') { writeSave(state); state.toast = { text: 'HOME SAFE · Progress saved', time: 3 }; return; }
     }
   }
-  if (p.car && distance(p, PLACES.garage) < 130 && p.money >= 250) {
-    p.money -= 250; p.car.hp = 150; p.car.color = ['#f58a69', '#62d6c3', '#d7b26b'][Math.floor(state.elapsed) % 3]; state.heat = 0;
-    state.toast = { text: 'GHOST CUSTOMS · Repaired, resprayed, heat cleared −$250', time: 4 }; return;
-  }
+  if (p.car && distance(p, PLACES.garage) < 175) { state.garageOpen = true; return; }
   if (interactWithCar(state)) return;
   if (!p.car && distance(p, PLACES.home) < 115) { writeSave(state); state.toast = { text: 'HOME SAFE · Progress saved', time: 3 }; return; }
   state.toast = { text: 'Find a car, contact, safehouse or shop · M opens the city map', time: 3 };
@@ -62,18 +60,28 @@ export function updateWorld(state, input, aim, dt) {
   state.elapsed += dt; state.time = (state.time + dt / 100) % 24;
   state.saved = Math.max(0, state.saved - dt); state.shake *= Math.exp(-dt * 12); state.toast.time = Math.max(0, state.toast.time - dt);
   state.effects.update(dt);
-  if (state.mapOpen || state.shopOpen || state.mission.briefing) return;
+  if (state.mapOpen || state.shopOpen || state.garageOpen || state.mission.briefing) return;
+  state.stats.playTime = (state.stats.playTime || 0) + dt;
+  if (state.stylePopup) { state.stylePopup.time -= dt; if (state.stylePopup.time <= 0) state.stylePopup = null; }
   const p = state.player, oldX = p.x, oldY = p.y;
   if (p.car) {
     const throttle = (input.key('KeyW') || input.key('ArrowUp') ? 1 : 0) - (input.key('KeyS') || input.key('ArrowDown') ? 1 : 0);
     const turn = (input.key('KeyD') || input.key('ArrowRight') ? 1 : 0) - (input.key('KeyA') || input.key('ArrowLeft') ? 1 : 0);
+    state.nitroActive = input.key('ShiftLeft') && throttle > 0 && state.nitro > 0 && state.upgrades.nitro > 0;
+    state.nitro = clamp(state.nitro + (state.nitroActive ? -25 : 6) * dt, 0, 100);
+    if (state.nitroActive) p.car.speed += 180 * dt;
     moveCar(state, p.car, throttle, turn, input.key('Space'), dt);
+    if (input.key('Space') && Math.abs(p.car.speed) > 90 && turn) {
+      state.styleScore += Math.floor(Math.abs(p.car.speed) * dt); state.stylePopup = { text: 'DRIFT', score: state.styleScore, time: 2 };
+    }
+    for (const c of state.cars) if (c !== p.car && !c.police && !c.passed && Math.abs(p.car.speed)>180 && distance(c,p.car)<72) { c.passed = true; state.styleScore += 150; state.stylePopup = { text: 'NEAR MISS', score: state.styleScore, time: 2.5 }; }
     p.x = p.car.x; p.y = p.car.y; p.angle = p.car.angle;
   } else {
     // Screen-relative movement is converted back through the oblique projection.
     let sx = (input.key('KeyD') || input.key('ArrowRight') ? 1 : 0) - (input.key('KeyA') || input.key('ArrowLeft') ? 1 : 0);
     let sy = (input.key('KeyS') || input.key('ArrowDown') ? 1 : 0) - (input.key('KeyW') || input.key('ArrowUp') ? 1 : 0);
     let dx = sx / .86 + sy / .48, dy = sy / .48 - sx / .86;
+    if (state.viewMode === '3d') { if(input.key('KeyQ')) state.camera.heading -= dt*1.8; if(input.key('KeyR')) state.camera.heading += dt*1.8; const a = state.camera.heading ?? -Math.PI / 2; dx = -Math.sin(a) * sx - Math.cos(a) * sy; dy = Math.cos(a) * sx - Math.sin(a) * sy; }
     const len = Math.hypot(dx, dy); if (len > 0) { dx /= len; dy /= len; }
     const speed = input.key('ShiftLeft') || input.key('ShiftRight') ? 195 : 115;
     const nx = p.x + dx * speed * dt, ny = p.y + dy * speed * dt;

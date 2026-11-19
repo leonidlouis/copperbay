@@ -18,4 +18,4 @@ writeFileSync(join(out, 'dossier.json'), buildDossier(out, {
   game_max_bytes: 50331648,
   game_path_max_bytes: 1000,
 }));
-console.log('Copper Bay: game, four photographs, and deterministic dossier ready.');
+console.log('COPPER BAY / Meridian Files — 3D city, six chapters, four live photographs packaged.');

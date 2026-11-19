@@ -50,7 +50,7 @@ export function updatePolice(state, dt) {
     else state.unseen += dt;
     if (state.unseen > 8 + level * 2) {
       state.heat = Math.max(0, Math.ceil(state.heat) - 1); state.unseen = 3;
-      if (state.heat === 0) { state.toast = { text: 'HEAT LOST · You disappeared into Copper Bay', time: 4 }; state.audio.sound('cash'); }
+      if (state.heat === 0) { state.stats.escapes = (state.stats.escapes || 0) + 1; state.toast = { text: 'HEAT LOST · You disappeared into Copper Bay', time: 4 }; state.audio.sound('cash'); }
     }
     if (level >= 4 && !state.roadblocks.length) {
       const x = nearestRoad(p.x + 480), y = nearestRoad(p.y);
