@@ -35,3 +35,10 @@ export function drawShippingContainer(p, cargo) {
     p.ctx.strokeStyle = '#f0d4ac44'; p.ctx.lineWidth = 1; p.ctx.beginPath(); p.ctx.moveTo(a.x, a.y); p.ctx.lineTo(b.x, b.y); p.ctx.stroke();
   }
 }
+
+export function drawHarborBoat(p, boat) {
+  const {x,y}=boat;
+  p.poly([p.project(x-14,y+31,1),p.project(x+14,y+31,1),p.project(x+14,y-22,1),p.project(x,y-45,1),p.project(x-14,y-22,1)],'#eee8cb','#799d96');
+  p.prism(x-8,y-10,16,26,10,'#3e6d7b','#e2dcc1','#a8b9ac');
+  const top=p.project(x,y+8,48),base=p.project(x,y+8,15),tip=p.project(x,y-23,15);p.poly([top,base,tip],'#fff1cb');
+}

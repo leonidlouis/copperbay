@@ -1,15 +1,18 @@
 import { createPainter } from './painter.js';
 import { drawCityGround, drawBuilding, drawPalm, drawLamp, drawStreetProp } from './city-art.js';
 import { drawVehicle, drawPerson, drawMissionMarker } from './actors-art.js';
-import { drawHarborCrane, drawRadioMast, drawShippingContainer } from './landmarks.js';
+import { drawHarborCrane, drawRadioMast, drawShippingContainer, drawHarborBoat } from './landmarks.js';
 import { createHUD } from './hud.js';
+import { createPerspectiveRenderer } from './render3d.js';
 import { missionTarget } from './missions.js';
 import { PLACES } from './city.js';
 import { clamp, hash } from './math.js';
 export function createRenderer(canvas) {
-  const p = createPainter(canvas), hud = createHUD(p), { ctx } = p;
+  const p = createPainter(canvas, true), hud = createHUD(p), { ctx } = p;
   function resize() { canvas.width = 1280; canvas.height = 800; }
   resize(); window.addEventListener('resize', resize);
+  const perspective = createPerspectiveRenderer(p);
+  let lastState;
   let groundCache, cacheBand = -1;
   const sprites = new Map();
   function scenery(draw, object, state, kind) {
@@ -62,7 +65,7 @@ export function createRenderer(canvas) {
       const q = p.project(x, y, 1); ctx.save(); ctx.translate(q.x, q.y); ctx.transform(.86 * p.view.zoom, .48 * p.view.zoom, -.43 * p.view.zoom, .24 * p.view.zoom, 0, 0); p.text(name, 0, 0, 20, '#bacab25c', '900', 'center'); ctx.restore();
     }
     const items = [];
-    for (const object of state.city.landmarks) if (p.visible(object.x, object.y, 300)) items.push({ depth: object.x + object.y, draw: () => object.type === 'crane' ? drawHarborCrane(p, object) : object.type === 'radio' ? drawRadioMast(p, object, state) : drawShippingContainer(p, object) });
+    for (const object of state.city.landmarks) if (p.visible(object.x, object.y, 300)) items.push({ depth: object.x + object.y, draw: () => object.type === 'boat' ? drawHarborBoat(p, object) : object.type === 'crane' ? drawHarborCrane(p, object) : object.type === 'radio' ? drawRadioMast(p, object, state) : drawShippingContainer(p, object) });
     for (const b of state.city.buildings) if (p.visible(b.x + b.w / 2, b.y + b.d / 2, 350)) items.push({ depth: b.x + b.y + (b.w + b.d) / 2, draw: () => scenery(drawBuilding, b, state, 'building') });
     for (const t of state.city.palms) if (p.visible(t.x, t.y, 100)) items.push({ depth: t.x + t.y, draw: () => scenery(drawPalm, t, state, 'palm') });
     for (const lamp of state.city.lamps) if (p.visible(lamp.x, lamp.y, 100)) items.push({ depth: lamp.x + lamp.y, draw: () => scenery(drawLamp, lamp, state, 'lamp') });
@@ -99,7 +102,7 @@ export function createRenderer(canvas) {
   }
   return {
     buttons: hud.buttons,
-    unproject: p.unproject,
-    draw(state, hasSave, volume) { ctx.setTransform(1, 0, 0, 1, 0, 0); world(state); hud.draw(state, hasSave, volume); },
+    unproject(x, y) { return perspective && lastState?.viewMode !== 'iso' ? perspective.aim(x, y) : p.unproject(x,y); },
+    draw(state, hasSave, volume) { ctx.setTransform(1, 0, 0, 1, 0, 0); lastState = state; perspective?.setVisible(!state.mapOpen && (state.viewMode !== 'iso' || state.garageOpen || state.screen === 'title')); if(state.mapOpen){hud.draw(state,hasSave,volume);return;} if (perspective && (state.viewMode !== 'iso' || state.garageOpen || state.screen === 'title')) perspective.draw(state); else world(state); hud.draw(state, hasSave, volume); },
   };
 }

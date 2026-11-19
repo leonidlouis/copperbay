@@ -5,6 +5,10 @@ import { createAudio } from './audio.js';
 import { readSave, writeSave, readSettings, saveSettings } from './save.js';
 import { advanceBriefing, startBriefing } from './missions.js';
 import { stageShot } from './shots.js';
+import { updateChaseCamera } from './camera.js';
+import { buyUpgrade } from './garage.js';
+import { PLACES } from './city.js';
+import { distance } from './math.js';
 import { lerp, clamp } from './math.js';
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas), input = createInput(canvas), audio = createAudio();
@@ -23,15 +27,19 @@ function action(id) {
   if (id === 'continue') start(true);
   if (id === 'controls') state.settingsOpen = !state.settingsOpen;
   if (id === 'resume') { state.settingsOpen = false; if (state.screen !== 'title') state.screen = 'play'; }
-  if (id === 'restart') { start(!!readSave()); state.heat = 0; state.player.health = 100; state.player.money = Math.max(0, state.player.money - 150); state.mission.briefing = false; state.player.x = 855; state.player.y = 790; state.camera.x = 855; state.camera.y = 790; }
+  if (id === 'restart') { start(!!readSave()); state.heat = 0; state.player.health = 100; state.player.money = Math.max(0, state.player.money - 150); state.mission.briefing = false; state.player.car = null; state.player.x = 855; state.player.y = 790; state.camera.x = 855; state.camera.y = 790; }
   if (id === 'save' && state.heat === 0) { writeSave(state); save = readSave(); }
   if (id === 'louder' || id === 'quieter') { settings.volume = clamp(settings.volume + (id === 'louder' ? .1 : -.1), 0, 1); audio.setVolume(settings.volume); saveSettings(settings); }
   if (['ammo', 'armor', 'health', 'shotgun'].includes(id)) buyItem(state, id);
+  if (id === 'closeGarage') state.garageOpen = false;
+  if (id === 'closeMap') state.mapOpen = false;
+  if (id.startsWith('upgrade-')) buyUpgrade(state,id.slice(8));
   if (id === 'closeShop') state.shopOpen = false;
 }
 function handleInput() {
   if (input.take('Escape') || input.take('KeyP')) {
     if (state.settingsOpen) state.settingsOpen = false;
+    else if (state.garageOpen) state.garageOpen = false;
     else if (state.shopOpen) state.shopOpen = false;
     else if (state.mapOpen) state.mapOpen = false;
     else if (state.screen === 'play') state.screen = 'pause';
@@ -46,7 +54,9 @@ function handleInput() {
     else if (state.mission.briefing) advanceBriefing(state);
   }
   if (state.screen === 'play') {
-    if (input.take('KeyE')) interact(state);
+    if (input.take('KeyE') && !state.mapOpen) interact(state);
+    if (input.take('KeyV')) state.viewMode = state.viewMode === 'iso' ? 'chase' : 'iso';
+    if (input.take('KeyG')) { if (state.player.car && distance(state.player,PLACES.garage)<180) state.garageOpen=!state.garageOpen; else state.toast={text:'Ghost Customs • drive to G on the city map',time:3}; }
     if (input.take('Tab') && state.mission.active) { state.mission.briefing = true; state.mission.radio = true; state.mission.dialogue = 0; }
     if (input.take('KeyM')) state.mapOpen = !state.mapOpen;
     if (input.take('KeyK')) {
@@ -60,7 +70,7 @@ function handleInput() {
   if (input.pointer.clicked) {
     const b = renderer.buttons.find(b => input.pointer.x >= b.x && input.pointer.x <= b.x + b.w && input.pointer.y >= b.y && input.pointer.y <= b.y + b.h);
     if (b) { action(b.id); input.pointer.down = false; }
-    else if (state.mission.briefing) { advanceBriefing(state); input.pointer.down = false; }
+    else if (state.mission.briefing && !state.mapOpen && !state.garageOpen && !state.shopOpen) { advanceBriefing(state); input.pointer.down = false; }
   }
   input.clear();
 }
@@ -79,6 +89,7 @@ function frame(now) {
     const x = state.player.x + Math.cos(state.player.angle) * look, y = state.player.y + Math.sin(state.player.angle) * look;
     state.camera.x = lerp(state.camera.x, x, 1 - Math.exp(-dt * 5)); state.camera.y = lerp(state.camera.y, y, 1 - Math.exp(-dt * 5)); state.camera.zoom = lerp(state.camera.zoom, car ? 1 : 1.22, dt * 2);
   }
+  updateChaseCamera(state,input,dt);
   audio.update(dt, state); renderer.draw(state, !!save, settings.volume);
 }
 if (shot) {

@@ -6,12 +6,12 @@ export const STORY = [
     { type: 'drive', text: 'Drive the Cavell to Inez at Pier 09.', target: { x: 825, y: 3200 } },
   ] },
   { name: 'PAPER TRAIL', contact: 'INEZ ROOK', role: 'A ledger, a debt, a way out', payout: 1200, start: { x: 825, y: 3200 }, dialogue: ['This ledger lists every bribe the port ever paid.', 'The missing pages are in Crown Quarter.', 'Voss has guards there. Bring the pages back alive.'], steps: [
-    { type: 'reach', text: 'Find Voss’s couriers in Crown Quarter.', target: { x: 2240, y: 1855 }, spawn: true },
-    { type: 'defeat', text: 'Take down the three couriers. Recover the pages.', target: { x: 2240, y: 1855 }, enemies: 3 },
-    { type: 'reach', text: 'Collect the missing pages.', target: { x: 2240, y: 1855 } },
+    { type: 'reach', text: 'Find Voss’s couriers in Crown Quarter.', target: { x: 1085, y: 2400 }, spawn: true },
+    { type: 'defeat', text: 'Take down the three couriers. Recover the pages.', target: { x: 1085, y: 2400 }, enemies: 3 },
+    { type: 'reach', text: 'Collect the missing pages.', target: { x: 1085, y: 2400 } },
   ] },
-  { name: 'GOLDEN HOUR', contact: 'SOL NAVARRO', role: 'Driver / professional optimist', payout: 1800, start: { x: 2240, y: 1855 }, dialogue: ['Port security are jamming our radio link.', 'I’ve got a van full of transmitters. They’re fragile.', 'Get it to the hills in under two minutes. No fireworks.'], steps: [
-    { type: 'steal', text: 'Find a vehicle. The hills are a long walk.', target: { x: 2240, y: 1760 } },
+  { name: 'GOLDEN HOUR', contact: 'SOL NAVARRO', role: 'Driver / professional optimist', payout: 1800, start: { x: 1085, y: 2400 }, dialogue: ['Port security are jamming our radio link.', 'I’ve got a van full of transmitters. They’re fragile.', 'Get it to the hills in under two minutes. No fireworks.'], steps: [
+    { type: 'steal', text: 'Find a vehicle. The hills are a long walk.', target: { x: 1085, y: 2240 } },
     { type: 'drive', text: 'Deliver the transmitters to Verdigris Hills.', target: { x: 3200, y: 800 }, limit: 120 },
   ] },
   { name: 'CUT THE STATIC', contact: 'ADA WREN', role: 'Free Bay Radio / voice of the city', payout: 2400, start: { x: 3200, y: 800 }, dialogue: ['Voss put a jammer in a port security van.', 'It’s parked behind the Copper Club.', 'Destroy the van. Give this city its voice back.'], steps: [

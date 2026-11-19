@@ -26,6 +26,7 @@ function chaseWaypoint(car, p) {
 }
 export function updatePolice(state, dt) {
   const level = Math.ceil(state.heat), p = state.player;
+  if (level >= 3) { const a = state.camera.heading ?? p.angle; state.helicopter = {x:p.x + Math.cos(a)*470 - Math.sin(a)*30, y:p.y + Math.sin(a)*470 + Math.cos(a)*30, z:120+Math.sin(state.elapsed)*5, angle:a+.4}; }
   const active = state.cars.filter(c => c.police && !c.wreck);
   let seen = false;
   for (const car of active) {
@@ -50,7 +51,7 @@ export function updatePolice(state, dt) {
     else state.unseen += dt;
     if (state.unseen > 8 + level * 2) {
       state.heat = Math.max(0, Math.ceil(state.heat) - 1); state.unseen = 3;
-      if (state.heat === 0) { state.toast = { text: 'HEAT LOST · You disappeared into Copper Bay', time: 4 }; state.audio.sound('cash'); }
+      if (state.heat === 0) { state.stats.escapes++; state.toast = { text: 'HEAT LOST · You disappeared into Copper Bay', time: 4 }; state.audio.sound('cash'); }
     }
     if (level >= 4 && !state.roadblocks.length) {
       const x = nearestRoad(p.x + 480), y = nearestRoad(p.y);

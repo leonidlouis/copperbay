@@ -49,7 +49,7 @@ export function updateCombat(state, dt) {
       for (const ped of state.peds) if (ped.hp > 0 && distance(b, ped) < 20) {
         ped.hp -= 38; ped.flee = 8; hit = true; state.effects.burst(ped.x, ped.y, '#f8b790', 8, 75);
         if (ped.police) state.crime(.6);
-        if (ped.hp <= 0) { state.stats.takedowns++; state.pickups.push({ x: ped.x, y: ped.y, kind: 'cash', value: ped.enemy ? 100 : 20 }); }
+        if (ped.hp <= 0) { state.combo={time:3,score:250,label:'TAKEDOWN',multiplier:2}; state.stats.takedowns++; state.pickups.push({ x: ped.x, y: ped.y, kind: 'cash', value: ped.enemy ? 100 : 20 }); }
         break;
       }
       for (const car of state.cars) if (car !== p.car && !car.wreck && distance(b, car) < 29) { car.hp -= 28; car.flash = .12; hit = true; break; }

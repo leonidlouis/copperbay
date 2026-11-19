@@ -1,6 +1,6 @@
 import { clamp } from './math.js';
 export function createPainter(canvas, transparent = false) {
-  const ctx = canvas.getContext('2d', { alpha: transparent, willReadFrequently: true });
+  const ctx = canvas.getContext('2d', { alpha: transparent });
   const view = { x: 1760, y: 1760, zoom: 1, shakeX: 0, shakeY: 0 };
   function project(x, y, z = 0) { return { x: 640 + (x - y - view.x + view.y) * .86 * view.zoom + view.shakeX, y: 415 + (x + y - view.x - view.y) * .48 * view.zoom - z * view.zoom + view.shakeY }; }
   function unproject(x, y) {

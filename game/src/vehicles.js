@@ -32,9 +32,10 @@ export function spawnTraffic() {
 export function moveCar(state, car, throttle, steering, brake, dt) {
   if (car.wreck) return;
   const spec = VEHICLE_TYPES[car.type];
-  car.speed += throttle * spec.accel * dt;
+  const level = car === state.player.car ? state.upgrades?.engine || 0 : 0, boost = car.boosting ? 1.5 : 1;
+  car.speed += throttle * spec.accel * (1 + level * .18) * boost * dt;
   car.speed *= Math.exp(-(brake ? 3.2 : throttle ? .12 : .85) * dt);
-  car.speed = clamp(car.speed, -spec.max * .35, spec.max);
+  car.speed = clamp(car.speed, -spec.max * .35, spec.max * (1 + level * .12) * boost);
   const steerPower = Math.min(1, Math.abs(car.speed) / 70);
   car.angle += steering * spec.turn * steerPower * dt * (car.speed < 0 ? -1 : 1) * (brake ? 1.55 : 1);
   const grip = brake ? 1.8 : spec.grip;
@@ -43,7 +44,7 @@ export function moveCar(state, car, throttle, steering, brake, dt) {
   const nx = car.x + car.vx * dt, ny = car.y + car.vy * dt;
   if (state.city.blocked(nx, ny, 17)) {
     if (Math.abs(car.speed) > 75) {
-      car.hp -= Math.abs(car.speed) * .08;
+      car.hp -= Math.abs(car.speed) * .08 / (1 + (state.upgrades?.armor || 0) * .35);
       state.effects.burst(car.x, car.y, '#ffc579', 10, 80);
       if (car === state.player.car) { state.shake = 6; state.audio.sound('hit'); }
     }
@@ -94,7 +95,7 @@ export function interactWithCar(state) {
     const offsets = [Math.PI / 2, -Math.PI / 2, Math.PI];
     for (const offset of offsets) {
       const x = car.x + Math.cos(car.angle + offset) * 49, y = car.y + Math.sin(car.angle + offset) * 49;
-      if (!state.city.blocked(x, y, 9)) { p.x = x; p.y = y; p.car = null; car.driver = false; car.parked = true; state.toast = { text: 'On foot · click to fire / F to punch', time: 3 }; return true; }
+      if (!state.city.blocked(x, y, 9)) { p.x = x; p.y = y; p.car = null; car.boosting = false; car.driver = false; car.parked = true; state.toast = { text: 'On foot · click to fire / F to punch', time: 3 }; return true; }
     }
     return true;
   }
@@ -114,7 +115,7 @@ export function updateCarCollisions(state, dt) {
   if (!car || Math.abs(car.speed) < 35) return;
   for (const other of state.cars) {
     if (other === car || distance(car, other) > 44 || other.cooldown > 0) continue;
-    other.cooldown = .65; other.hp -= Math.abs(car.speed) * .17; car.hp -= Math.abs(car.speed) * .07;
+    other.cooldown = .65; other.hp -= Math.abs(car.speed) * .17; car.hp -= Math.abs(car.speed) * .07 / (1 + (state.upgrades?.armor || 0) * .35);
     other.x += Math.cos(car.angle) * 18; other.y += Math.sin(car.angle) * 18;
     car.speed *= .58; state.shake = 6; state.effects.burst(car.x, car.y, '#ffd393', 16, 130); state.audio.sound('hit');
     if (other.police) state.crime(.25);

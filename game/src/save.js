@@ -3,7 +3,7 @@ const SETTINGS_KEY = 'copper-bay.settings.v1';
 export function readSave() { try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); return s?.version === 1 ? s : null; } catch { return null; } }
 export function writeSave(state) {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, x: state.player.x, y: state.player.y, money: state.player.money, armor: state.player.armor, ammo: state.player.ammo, shotgun: state.player.shotgun, mission: state.mission.index, time: state.time, stats: state.stats }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ version: 1, x: state.player.x, y: state.player.y, money: state.player.money, armor: state.player.armor, ammo: state.player.ammo, shotgun: state.player.shotgun, mission: state.mission.index, time: state.time, stats: state.stats, upgrades: state.upgrades, viewMode: state.viewMode, car: state.player.car ? {type:state.player.car.type,color:state.player.car.color,angle:state.player.car.angle,hp:state.player.car.hp,nitro:state.player.car.nitro} : null }));
     state.saved = 3; return true;
   } catch { state.toast = { text: 'Storage unavailable — progress stays in this session', time: 4 }; return false; }
 }

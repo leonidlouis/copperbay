@@ -16,7 +16,7 @@ export const PLACES = {
   dock: { x: 820, y: 3225, name: 'PIER 09', icon: 'D' },
   radio: { x: 3220, y: 835, name: 'FREE BAY RADIO', icon: 'R' },
   clinic: { x: 2525, y: 2250, name: 'BAY CLINIC', icon: '+' },
-  garage: { x: 3205, y: 2715, name: 'GHOST CUSTOMS', icon: 'G' },
+  garage: { x: 345, y: 3195, name: 'GHOST CUSTOMS', icon: 'G' },
 };
 export function districtAt(x, y) {
   if (y > 2760) return DISTRICTS[0];
@@ -30,7 +30,8 @@ export function createCity() {
   const rng = randomGenerator(8675309);
   const buildings = [], palms = [], lamps = [], props = [], parks = [];
   const landmarks = [{ x: 255, y: 2950, type: 'crane' }, { x: 255, y: 3470, type: 'crane' }, { x: 3294, y: 875, type: 'radio' }];
-  for (let i = 0; i < 16; i++) landmarks.push({ x: 210 + (i % 2) * 110, y: 2790 + Math.floor(i / 2) * 81, type: 'container', color: ['#ba756b', '#609a9a', '#c6a470'][i % 3] });
+  for (const [x,y] of [[-85,1850],[-280,1430],[-70,3490]]) landmarks.push({x,y,type:'boat'});
+  for (let i = 0; i < 16; i++) landmarks.push({ x: -130 + (i % 2) * 110, y: 2790 + Math.floor(i / 2) * 81, type: 'container', color: ['#ba756b', '#609a9a', '#c6a470'][i % 3] });
   const signs = ['SOLARIS', 'BAY FM 88.4', 'COPPER CLUB', 'MOTEL', 'PALOMA', 'OPEN LATE', 'NIGHT OWL', 'CROWN BANK', 'ARCADE', 'GOLDEN HOUR', 'VINYL', 'ORBIT'];
   const colors = ['#d9a58d', '#c58782', '#d5b49b', '#829e9f', '#e6ba9a', '#ad9db0', '#799a97'];
   for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
@@ -50,7 +51,9 @@ export function createCity() {
       if (i >= 3 && i <= 5 && j >= 2 && j <= 4) h += rng() * 85;
       if (j >= 5) h = 28 + rng() * 20;
       if (i >= 5 && j < 3) h = 25 + rng() * 20;
-      buildings.push({ x: bx, y: by, w, d, h, variant: j >= 5 ? 'warehouse' : i >= 5 && j < 3 ? 'villa' : j < 2 ? 'strip' : 'urban', color: colors[Math.floor(rng() * colors.length)], roof: rng() > .45 ? '#5c777b' : '#bd9386', sign: signs[(i * 3 + j + k * 5) % signs.length], neon: ['#70efdb', '#ff8a9e', '#ffc86a'][(i + j + k) % 3], id: buildings.length, floors: Math.max(1, Math.floor(h / 23)) });
+      if ((i === 0 && j < 5) || (i === 1 && j === 3)) h = 140 + rng() * 150;
+      if (i >= 3 && i <= 5 && j >= 2 && j <= 4) h *= 1.7;
+      buildings.push({ x: bx, y: by, w, d, h, variant: h > 130 ? 'tower' : j >= 5 ? 'warehouse' : i >= 5 && j < 3 ? 'villa' : j < 2 ? 'strip' : 'urban', color: colors[Math.floor(rng() * colors.length)], roof: rng() > .45 ? '#5c777b' : '#bd9386', sign: signs[(i * 3 + j + k * 5) % signs.length], neon: ['#70efdb', '#ff8a9e', '#ffc86a'][(i + j + k) % 3], id: buildings.length, floors: Math.max(1, Math.floor(h / 23)) });
     }
     for (let k = 0; k < 3; k++) {
       palms.push({ x: x + k * 100 + 24, y: y - 12 });
@@ -63,6 +66,9 @@ export function createCity() {
     lamps.push({ x: x - 87, y: y - 88 });
     props.push({ x: x + 91, y: y - 84, type: 'signal' });
   }
+  for (let y = 230; y < 3920; y += 85) palms.push({x: 219, y});
+  // The customs workshop is a real, collidable landmark on the port boulevard.
+  buildings.push({x: 427, y: 3100, w: 145, d: 105, h: 31, color: '#d8b59a', roof: '#cee2c6', sign: 'GHOST CUSTOMS', neon: '#88ecd0', variant: 'warehouse', id: 99, floors: 1});
   return {
     buildings, palms, lamps, props, parks, landmarks,
     blocked(x, y, radius = 8) {
